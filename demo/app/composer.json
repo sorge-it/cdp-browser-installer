@@ -1,0 +1,14 @@
+{
+    "name": "demo/browser",
+    "description": "The app the demo of sorge-it/cdp-browser-installer runs.",
+    "license": "MIT",
+    "require": {
+        "sorge-it/cdp-browser-installer": "*@dev"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../.."
+        }
+    ]
+}

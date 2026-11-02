@@ -1,0 +1,82 @@
+{
+    "name": "sorge-it/cdp-browser-installer",
+    "description": "Installs a pinned, SHA-256-checked chrome-headless-shell from Chrome for Testing as a Composer dev dependency: the same headless Chrome for every developer and CI run, without Node. Built for agentic engineering.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["ai-agents", "coding-agents", "agentic-engineering", "security", "supply-chain-security", "sha256", "installer", "github-actions", "testing", "browser-testing", "e2e-testing", "pest", "phpunit", "chrome-for-testing", "chrome-headless-shell", "headless-chrome", "headless-browser", "chromium", "cdp", "chrome-devtools-protocol"],
+    "homepage": "https://github.com/sorge-it/cdp-browser-installer",
+    "authors": [
+        {
+            "name": "Stefan Sorge",
+            "homepage": "https://github.com/sorge-it"
+        }
+    ],
+    "support": {
+        "source": "https://github.com/sorge-it/cdp-browser-installer",
+        "docs": "https://github.com/sorge-it/cdp-browser-installer#readme",
+        "security": "https://github.com/sorge-it/cdp-browser-installer/security/policy"
+    },
+    "require": {
+        "php": "^8.4",
+        "ext-posix": "*",
+        "sorge-it/safe-unzip": "^1.0",
+        "symfony/console": "^7.4.8|^8.0",
+        "symfony/process": "^7.4.8|^8.0"
+    },
+    "require-dev": {
+        "ext-mbstring": "*",
+        "ext-zip": "*",
+        "laravel/pint": "^1.29",
+        "pestphp/pest": "^5.3.5",
+        "pestphp/pest-plugin-type-coverage": "^5.0.3",
+        "phpstan/phpstan": "^2.3",
+        "phpunit/php-code-coverage": "^14.3",
+        "rector/rector": "^2.8.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "SorgeIt\\CdpBrowserInstaller\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "SorgeIt\\CdpBrowserInstaller\\Tests\\": "tests/"
+        }
+    },
+    "bin": [
+        "bin/cdp-browser"
+    ],
+    "scripts": {
+        "test": [
+            "@test:lint",
+            "@test:types",
+            "@test:type-coverage",
+            "@test:unit"
+        ],
+        "test:unit": "pest",
+        "test:types": "phpstan",
+        "test:type-coverage": "@php -d memory_limit=1G vendor/bin/pest --type-coverage --min=100 --no-cache",
+        "test:coverage": "@php -d memory_limit=1G vendor/bin/pest --coverage --min=100",
+        "test:lint": [
+            "pint --test",
+            "rector --dry-run"
+        ],
+        "lint": [
+            "rector",
+            "pint"
+        ]
+    },
+    "config": {
+        "platform": {
+            "php": "8.4.1"
+        },
+        "sort-packages": true,
+        "preferred-install": "dist",
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        },
+        "lock": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

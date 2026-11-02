@@ -1,0 +1,16 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use SorgeIt\CdpBrowserInstaller\Console\Cli;
+use SorgeIt\CdpBrowserInstaller\Platform;
+
+// Composer 2.2 and later sets the variable in the proxy it writes to `vendor/bin`.
+require $GLOBALS['_composer_autoload_path'] ?? dirname(__DIR__).'/vendor/autoload.php';
+
+exit(Cli::application(
+    environment: getenv(),
+    user: posix_geteuid(),
+    platform: Platform::current(...),
+)->run());

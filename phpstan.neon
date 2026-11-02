@@ -1,0 +1,15 @@
+parameters:
+    level: max
+    paths:
+        - bin
+        - src
+        - tests
+    reportUnmatchedIgnoredErrors: true
+    tmpDir: .tmp/phpstan
+
+services:
+    # `$this` in a closure of Pest is tests/TestCase.php, with the properties of each `beforeEach`.
+    -
+        class: SorgeIt\CdpBrowserInstaller\Tests\PHPStan\PestClosureThis
+        tags:
+            - phpstan.functionParameterClosureThisExtension

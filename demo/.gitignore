@@ -1,0 +1,6 @@
+/app/vendor/
+/app/composer.lock
+/app/.cache/
+/app/.chrome-version
+/app/out-*
+/output/*.part
