@@ -24,7 +24,7 @@ env:
   SETUP_PHP_COMPOSER: composer:2.10.3@sha256:7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6
 
 jobs:
-  # `pin` of the pinned version again, into a pin file of its own: four downloads, 438 MiB, each
+  # `pin` of the pinned version again, into a pin file of its own: four downloads, 445 MiB, each
   # checked as on the first pin. No cache: the download is the check. Red when `pin` fails or a
   # SHA-256 differs from .chrome-version.
   chrome-for-testing:

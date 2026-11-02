@@ -1,0 +1,100 @@
+name: works-with
+
+on:
+  # After each merge, so that the badge in the README shows the state of main.
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - .chrome-version
+      - .github/workflows/works-with.yml
+      - bin/**
+      - composer.json
+      - src/**
+      - works-with/**
+  # Weekly, as a new release of a tool that the README names can break the job without a commit
+  # here.
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its older run; every other run has a group of its own.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
+# Kept by hand, as in tests.yml.
+env:
+  SETUP_PHP_COMPOSER: composer:2.10.3@sha256:7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6
+
+jobs:
+  # Each tool under "Works with" in the README, at its newest release, drives the browser of
+  # .chrome-version. Not a required check: a new release of a tool must not block a pull request.
+  # Each tool has a step of its own, so the failed step names the tool.
+  works-with:
+    name: Works with · ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm, macos-15]
+
+    defaults:
+      run:
+        working-directory: works-with
+
+    env:
+      CDP_BROWSER_PATH: ${{ github.workspace }}/works-with/.cache
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # chrome-php/chrome needs ext-sockets, dmore/chrome-mink-driver ext-curl and ext-mbstring.
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          extensions: curl, mbstring, posix, sockets
+          coverage: none
+          tools: ${{ env.SETUP_PHP_COMPOSER }}
+
+      # No lock file: each run installs the newest release of each tool. `outdated --strict` fails
+      # when a constraint holds a tool below its newest release, which the README would claim.
+      - name: Install this checkout and the tools
+        run: |
+          composer update --no-interaction --prefer-dist
+          composer show --direct
+          composer outdated --direct --strict
+
+      - name: Audit the dependencies
+        run: composer audit
+
+      - name: Install the system libraries
+        run: sudo "$(command -v php)" vendor/bin/cdp-browser deps
+
+      - name: Install the browser of .chrome-version
+        run: |
+          cp ../.chrome-version .
+          vendor/bin/cdp-browser install
+
+      # Each script adds the row of its tool: the proof of this run, beside the run.
+      - name: Start the summary
+        run: |
+          {
+            echo '| Tool | Version | Browser | Platform |'
+            echo '|---|---|---|---|'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: chrome-php/chrome
+        run: php chrome-php.php
+
+      - name: dmore/chrome-mink-driver
+        run: php chrome-mink-driver.php
