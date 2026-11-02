@@ -2,8 +2,12 @@
 
 **Pinned headless Chrome™ for PHP browser tests, installed by Composer. No Node, no npm.**
 
-[![License](https://img.shields.io/badge/license-MIT-blue)](https://github.com/sorge-it/cdp-browser-installer/blob/main/LICENSE)
-[![PHP Version](https://img.shields.io/badge/php-%5E8.4-777bb4)](https://github.com/sorge-it/cdp-browser-installer/blob/main/composer.json)
+[![Tests](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/tests.yml/badge.svg)](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/tests.yml)
+[![Chrome for Testing](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/chrome-for-testing.yml/badge.svg)](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/chrome-for-testing.yml)
+[![Latest Version](https://img.shields.io/packagist/v/sorge-it/cdp-browser-installer)](https://packagist.org/packages/sorge-it/cdp-browser-installer)
+[![Total Downloads](https://img.shields.io/packagist/dt/sorge-it/cdp-browser-installer)](https://packagist.org/packages/sorge-it/cdp-browser-installer)
+[![License](https://img.shields.io/packagist/l/sorge-it/cdp-browser-installer)](https://github.com/sorge-it/cdp-browser-installer/blob/main/LICENSE)
+[![PHP Version](https://img.shields.io/packagist/dependency-v/sorge-it/cdp-browser-installer/php)](https://github.com/sorge-it/cdp-browser-installer/blob/main/composer.json)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/sorge-it/cdp-browser-installer/blob/main/phpstan.neon)
 
 `sorge-it/cdp-browser-installer` installs `chrome-headless-shell` from
