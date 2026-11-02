@@ -1,0 +1,415 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  # Weekly, as the stacks lowest and newest change with each release of a package, also without a
+  # commit here.
+  schedule:
+    - cron: '17 5 * * 1'
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its older run; every other run, such as one of main, of a
+# tag or of the schedule, has a group of its own.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
+# Kept by hand: Dependabot moves the actions, but no image digest and no checksum of a tool.
+env:
+  COMPOSER_IMAGE: composer:2.10.3@sha256:2cf275428757e5435a667bfc0d038b14520ca02be2b1b70d44a05c8c19e2de48
+  SETUP_PHP_COMPOSER: composer:2.10.3@sha256:7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6
+  ZIZMOR_IMAGE: ghcr.io/zizmorcore/zizmor:1.31.1@sha256:42d409dbb851d4c5d35a058cf042b828bea1e3f2884378c526eb0974780e18d9
+  ACTIONLINT_IMAGE: rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+
+jobs:
+  # The workflows and the Dependabot configuration: zizmor with the audits that need no GitHub
+  # token, and actionlint with shellcheck.
+  workflows:
+    name: Workflows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Audit with zizmor
+        run: docker run --rm --volume "$PWD:/src:ro" --workdir /src "$ZIZMOR_IMAGE" --offline .github
+
+      - name: Lint with actionlint
+        run: docker run --rm --volume "$PWD:/src:ro" --workdir /src "$ACTIONLINT_IMAGE" -no-color
+
+  tests:
+    name: PHP ${{ matrix.php }} · ${{ matrix.stack }} · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The lowest versions that composer.json and the development packages allow, also of
+          # each indirect package. Pest 5 needs symfony/process 8.1, so Symfony 7.4 runs in the job
+          # symfony-7. The lint differs with each Rector, so composer.json asks for the Rector of
+          # the lock.
+          - php: '8.4'
+            os: ubuntu-24.04
+            stack: lowest
+          # The newest versions that run on PHP 8.4. composer.json fixes PHP 8.4.1 for the lock, as
+          # PHPUnit 13 needs it; without it, the solver takes the PHP of the runner. Also the
+          # coverage: a new php-code-coverage can break the helper `php()` of the tests.
+          - php: '8.4'
+            os: ubuntu-24.04
+            stack: newest
+            coverage: pcov
+          # The versions of composer.lock.
+          - php: '8.5'
+            os: ubuntu-24.04
+            stack: locked
+          # The zipinfo and unzip of macOS: Apple changed its Info-ZIP 6.00.
+          - php: '8.5'
+            os: macos-15
+            stack: locked
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, mbstring, pcntl, posix, zip
+          coverage: ${{ matrix.coverage || 'none' }}
+          tools: ${{ env.SETUP_PHP_COMPOSER }}
+
+      - name: Install dependencies
+        env:
+          STACK: ${{ matrix.stack }}
+        run: |
+          case "$STACK" in
+            lowest) composer update --no-interaction --prefer-dist --prefer-lowest ;;
+            newest) composer config --unset platform.php && composer update --no-interaction --prefer-dist ;;
+            locked) composer install --no-interaction --prefer-dist ;;
+            *) echo "No install for the stack $STACK." && exit 1 ;;
+          esac
+
+      # The job coverage audits composer.lock; the stacks lowest and newest install other versions.
+      - name: Audit the installed packages
+        if: matrix.stack != 'locked'
+        run: composer audit
+
+      - name: Test
+        run: composer test
+
+      - name: Coverage
+        if: matrix.coverage == 'pcov'
+        run: composer test:coverage
+
+  # Each line of src/ and bin/ under test. pcov from the php.ini, so that `php()` collects the lines
+  # of a child process. The gate needs a user that is not root: root skips the tests of file modes.
+  coverage:
+    name: Coverage · PHP 8.5
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          extensions: curl, mbstring, pcntl, posix, zip
+          coverage: pcov
+          tools: ${{ env.SETUP_PHP_COMPOSER }}
+
+      # Once, in this job only: composer.json and the lock do not change with the PHP of a job.
+      - name: Validate composer.json and the lock
+        run: composer validate --strict
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Audit the locked packages
+        run: composer audit --locked
+
+      - name: Coverage
+        run: composer test:coverage
+
+  # The suite on musl, on x64 and arm64, as a user that is not root. musl has no GLOB_BRACE, and
+  # only a run on Alpine finds such a difference.
+  suite-alpine:
+    name: Suite · Alpine · PHP ${{ matrix.php }} · ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.4', '8.5']
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        include:
+          - php: '8.4'
+            image: php:8.4.27-cli-alpine@sha256:d8784155c4d37986be9ddd7a8950df7e78998cc48e35472cd69e2b9371424a65
+          - php: '8.5'
+            image: php:8.5.12-cli-alpine@sha256:e899a75c775804e5466dbd9c96b31f8b6c6ae2ddb053a8466223a0c32992ff8e
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          docker run --rm --entrypoint cat "$COMPOSER_IMAGE" /usr/bin/composer > "$RUNNER_TEMP/composer"
+          chmod 755 "$RUNNER_TEMP/composer"
+          docker run --rm --volume "$PWD:/src:ro" --volume "$RUNNER_TEMP/composer:/usr/local/bin/composer:ro" --entrypoint sh "$IMAGE" -euc '
+            apk add --no-cache unzip libzip-dev $PHPIZE_DEPS linux-headers > /dev/null
+            docker-php-ext-install zip pcntl > /dev/null
+            cp -a /src /work
+            chown -R www-data /work
+            su www-data -s /bin/sh -c "cd /work && export COMPOSER_HOME=/tmp/composer && composer install --no-interaction --no-progress && composer test"
+          '
+
+  # The suite on Debian with the oldest PHP, as a user that is not root, so that the tests of file
+  # modes run.
+  suite-debian:
+    name: Suite · Debian · PHP 8.4
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test
+        run: |
+          docker run --rm --entrypoint cat "$COMPOSER_IMAGE" /usr/bin/composer > "$RUNNER_TEMP/composer"
+          chmod 755 "$RUNNER_TEMP/composer"
+          docker run --rm --volume "$PWD:/src:ro" --volume "$RUNNER_TEMP/composer:/usr/local/bin/composer:ro" --entrypoint sh php:8.4.27-cli@sha256:9cf851bc2c1b37c3e59dfd677a3c3e56d485af5a47c93f629424bb039eafcb69 -euc '
+            apt-get -qq update
+            apt-get -qq install -y --no-install-recommends unzip libzip-dev > /dev/null
+            docker-php-ext-install zip pcntl > /dev/null
+            cp -a /src /work
+            chown -R www-data /work
+            su www-data -s /bin/sh -c "cd /work && export COMPOSER_HOME=/tmp/composer && composer install --no-interaction --no-progress && composer test"
+          '
+
+  # The real browser of `.chrome-version` on each platform: install from Chrome for Testing, or
+  # from the cache, then a page through the binary.
+  browser:
+    name: Browser · ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux64
+            runner: ubuntu-24.04
+          - platform: linux-arm64
+            runner: ubuntu-24.04-arm
+          - platform: mac-x64
+            runner: macos-15-intel
+          - platform: mac-arm64
+            runner: macos-15
+
+    env:
+      CDP_BROWSER_PATH: ${{ github.workspace }}/.cache/cdp-browser
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          extensions: posix
+          coverage: none
+          tools: ${{ env.SETUP_PHP_COMPOSER }}
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-dev
+
+      # Only the archive: its SHA-256 is in the pin file of the repository, and the installer checks
+      # it after the restore. zizmor's finding of cache poisoning: a forged entry can restore other
+      # paths too, but this workflow publishes nothing, reads only contents and uses no secret.
+      - name: Cache the archive # zizmor: ignore[cache-poisoning]
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/cdp-browser/*/*/*.zip
+          key: cdp-browser-${{ matrix.platform }}-${{ hashFiles('.chrome-version') }}
+
+      - name: Install the system libraries
+        run: sudo "$(command -v php)" bin/cdp-browser deps
+
+      - name: Install the browser
+        run: |
+          php bin/cdp-browser install
+          php bin/cdp-browser install
+
+      # Ubuntu 24.04 blocks the user namespaces of the Chrome sandbox through AppArmor.
+      - name: Load a page
+        run: |
+          browser="$(php bin/cdp-browser path)"
+          "$browser" --version
+          if [ "$RUNNER_OS" = Linux ]; then set -- --no-sandbox; fi
+          "$browser" "$@" --dump-dom 'data:text/html,<p>ok</p>' | grep -q '<p>ok</p>'
+
+  # A minimal image has none of the libraries a runner brings, so only here `deps` proves its list.
+  # Ubuntu 26.04, as the PHP of 24.04 is 8.3.
+  system-libraries:
+    name: deps · ${{ matrix.system }} · ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        system: ['debian:13', 'ubuntu:26.04']
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        include:
+          - system: 'debian:13'
+            image: debian:13@sha256:2dc419c6d7fe3dad0a2f9fd469c34cc90b0f9ba642d8fde837fe3d7d34a0e7f1
+          - system: 'ubuntu:26.04'
+            image: ubuntu:26.04@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install as root, run as a user
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          docker run --rm --entrypoint cat "$COMPOSER_IMAGE" /usr/bin/composer > "$RUNNER_TEMP/composer"
+          chmod 755 "$RUNNER_TEMP/composer"
+          docker run --rm --volume "$PWD:/src" --volume "$RUNNER_TEMP/composer:/usr/local/bin/composer:ro" --workdir /src "$IMAGE" bash -euo pipefail -c '
+            apt-get update
+            apt-get install --yes --no-install-recommends ca-certificates php-cli php-curl php-xml php-zip
+            composer install --no-interaction --no-progress --no-dev
+            php bin/cdp-browser deps
+            useradd --create-home tester
+            chown -R tester /src
+            runuser -u tester -- php bin/cdp-browser install
+            browser="$(runuser -u tester -- php bin/cdp-browser path)"
+            if ldd "$browser" | grep "not found"; then exit 1; fi
+            runuser -u tester -- "$browser" --no-sandbox --dump-dom "data:text/html,<p>ok</p>" | grep -q "<p>ok</p>"
+          '
+
+  # Chrome for Testing needs glibc. On Alpine `install` refuses to download and `path` gives the
+  # same message, `deps` installs the chromium of Alpine, and CDP_BROWSER_BINARY points `install`
+  # to it.
+  alpine:
+    name: Alpine · ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Refuse to download, install the chromium of Alpine, use it
+        run: |
+          docker run --rm --volume "$PWD:/src" --workdir /src --entrypoint sh "$COMPOSER_IMAGE" -euc '
+            composer install --no-interaction --no-progress --no-dev
+            php bin/cdp-browser deps
+            adduser -D tester
+            chown -R tester /src
+            if su tester -c "php bin/cdp-browser install" 2> refused.txt; then exit 1; fi
+            grep -q "does not start on musl" refused.txt
+            if su tester -c "php bin/cdp-browser path" 2> refused.txt; then exit 1; fi
+            grep -q "does not start on musl" refused.txt
+            browser="$(command -v chromium || command -v chromium-browser)"
+            su tester -c "CDP_BROWSER_BINARY=$browser php bin/cdp-browser install"
+            binary="$(su tester -c "CDP_BROWSER_BINARY=$browser php bin/cdp-browser path")"
+            su tester -c "$binary --headless --no-sandbox --dump-dom data:text/html,%3Cp%3Eok%3C/p%3E" | grep -q "<p>ok</p>"
+          '
+
+  # The suite needs Symfony 8: Pest 5 requires symfony/process 8.1. composer.json also allows
+  # Symfony 7.4.8, so this job drops the development packages, installs the lowest versions, and
+  # runs the commands on the browser of .chrome-version for linux64.
+  symfony-7:
+    name: Symfony 7.4 · CLI
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    env:
+      CDP_BROWSER_PATH: ${{ github.workspace }}/.cache/cdp-browser
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.4'
+          extensions: posix
+          coverage: none
+          tools: ${{ env.SETUP_PHP_COMPOSER }}
+
+      - name: Install the lowest versions without the development packages
+        run: |
+          # shellcheck disable=SC2016 # The `$` in single quotes is PHP's.
+          php -r '$json = json_decode((string) file_get_contents("composer.json"), true, flags: JSON_THROW_ON_ERROR); unset($json["require-dev"]); file_put_contents("composer.json", json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));'
+          composer update --no-interaction --prefer-dist --prefer-lowest --no-dev
+          for package in symfony/console symfony/process; do
+            composer show "$package" | grep -E '^versions : \* v7\.4\.'
+          done
+
+      - name: Install the system libraries
+        run: sudo "$(command -v php)" bin/cdp-browser deps
+
+      - name: Install the browser and start it
+        run: |
+          php bin/cdp-browser install
+          browser="$(php bin/cdp-browser path)"
+          "$browser" --version
+
+      # As in the demo: without the browser and its stamp, `install` reads the archive in the cache.
+      - name: Refuse the archive with one byte added
+        run: |
+          tree="$(dirname "$(php bin/cdp-browser path)")"
+          rm -rf "$tree" "$(dirname "$tree")/.sha256"
+          printf x >> "$tree.zip"
+          status=0
+          php bin/cdp-browser install 2> "$RUNNER_TEMP/refused.txt" || status=$?
+          cat "$RUNNER_TEMP/refused.txt"
+          # The exit code of a ChecksumException.
+          test "$status" -eq 65
+          grep -q "The archive is deleted and nothing was unpacked." "$RUNNER_TEMP/refused.txt"
+          test ! -e "$tree.zip"

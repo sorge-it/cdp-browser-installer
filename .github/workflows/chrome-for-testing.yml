@@ -1,0 +1,118 @@
+name: chrome-for-testing
+
+on:
+  pull_request:
+    paths:
+      - .chrome-version
+      - .github/workflows/chrome-for-testing.yml
+  # Weekly, as Chrome for Testing changes without a commit here: other bytes for the pinned
+  # version, or a newer Stable.
+  schedule:
+    - cron: '41 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its older run; every other run has a group of its own.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
+# Kept by hand, as in tests.yml.
+env:
+  SETUP_PHP_COMPOSER: composer:2.10.3@sha256:7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6
+
+jobs:
+  # `pin` of the pinned version again, into a pin file of its own: four downloads, 438 MiB, each
+  # checked as on the first pin. No cache: the download is the check. Red when `pin` fails or a
+  # SHA-256 differs from .chrome-version.
+  chrome-for-testing:
+    name: Chrome for Testing · SHA-256
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          extensions: posix
+          coverage: none
+          tools: ${{ env.SETUP_PHP_COMPOSER }}
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-dev
+
+      - name: Pin the version of .chrome-version again
+        run: |
+          version="$(php -r 'require "vendor/autoload.php"; echo SorgeIt\CdpBrowserInstaller\Pin::read(".chrome-version")->version;')"
+          php bin/cdp-browser pin "$version" --pin-file "$RUNNER_TEMP/chrome-version"
+
+      - name: Compare each SHA-256 with .chrome-version
+        run: |
+          # shellcheck disable=SC2016 # The `$` in single quotes is PHP's.
+          php -r '
+            require "vendor/autoload.php";
+            $pinned = SorgeIt\CdpBrowserInstaller\Pin::read($argv[1]);
+            $served = SorgeIt\CdpBrowserInstaller\Pin::read($argv[2]);
+            $differs = false;
+            foreach (SorgeIt\CdpBrowserInstaller\Platform::cases() as $platform) {
+                if ($pinned->hash($platform) !== $served->hash($platform)) {
+                    printf("::error::The SHA-256 of %s %s differs: %s pins %s, Chrome for Testing serves %s.\n", $pinned->version, $platform->value, $argv[1], $pinned->hash($platform), $served->hash($platform));
+                    $differs = true;
+                }
+            }
+            if (! $differs) {
+                printf("Chrome for Testing serves the pinned bytes of %s for each platform.\n", $pinned->version);
+            }
+            exit($differs ? 1 : 0);
+          ' .chrome-version "$RUNNER_TEMP/chrome-version"
+
+  # Red when Chrome for Testing has a newer Stable than .chrome-version: GitHub has no yellow
+  # check, and its notice of a run can be set to failed runs only. A job of its own, so that a new
+  # Stable never hides a SHA-256 that differs.
+  stable:
+    name: Chrome for Testing · Stable
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          extensions: posix
+          coverage: none
+          tools: ${{ env.SETUP_PHP_COMPOSER }}
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-dev
+
+      - name: Compare the pin with the current Stable
+        env:
+          VERSIONS_URL: https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
+        run: |
+          curl -q --silent --show-error --fail --proto =https --tlsv1.2 --output "$RUNNER_TEMP/versions.json" "$VERSIONS_URL"
+          # shellcheck disable=SC2016 # The `$` in single quotes is PHP's.
+          php -r '
+            require "vendor/autoload.php";
+            $pinned = SorgeIt\CdpBrowserInstaller\Pin::read(".chrome-version")->version;
+            $stable = (string) (json_decode((string) file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR)["channels"]["Stable"]["version"] ?? "");
+            SorgeIt\CdpBrowserInstaller\Pin::checkVersion($stable);
+            if (version_compare($stable, $pinned, ">")) {
+                printf("::error::Chrome for Testing Stable is %s, the pin is %s. Update the pin; see \"When the Chrome for Testing check fails\" in CONTRIBUTING.md.\n", $stable, $pinned);
+                exit(1);
+            }
+            printf("The pin %s is not older than the current Stable %s.\n", $pinned, $stable);
+          ' "$RUNNER_TEMP/versions.json"

@@ -1,0 +1,2 @@
+# The Dockerfile copies nothing from here; app/.cache holds a browser after `make record`.
+*
