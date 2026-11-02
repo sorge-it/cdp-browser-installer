@@ -4,6 +4,7 @@
 
 [![Tests](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/tests.yml/badge.svg)](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/tests.yml)
 [![Chrome for Testing](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/chrome-for-testing.yml/badge.svg)](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/chrome-for-testing.yml)
+[![Works with](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/works-with.yml/badge.svg)](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/works-with.yml)
 [![Latest Version](https://img.shields.io/packagist/v/sorge-it/cdp-browser-installer)](https://packagist.org/packages/sorge-it/cdp-browser-installer)
 [![Total Downloads](https://img.shields.io/packagist/dt/sorge-it/cdp-browser-installer)](https://packagist.org/packages/sorge-it/cdp-browser-installer)
 [![License](https://img.shields.io/packagist/l/sorge-it/cdp-browser-installer)](https://github.com/sorge-it/cdp-browser-installer/blob/main/LICENSE)
@@ -43,8 +44,9 @@ first. In the
 macOS arm64, the first `install` took 9.4 s with the download, the second 0.0 s.
 
 A test tool that drives Chrome through the Chrome DevTools Protocol (CDP) starts the binary that
-`path` prints, or calls the [PHP API](#use-from-php). The package contains no Pest or PHPUnit
-plugin, and it installs no ChromeDriver. A project with Node can use
+`path` prints, or calls the [PHP API](#use-from-php). [Works with](#works-with) names the tools
+that a CI job proves with this browser. The package contains no Pest or PHPUnit plugin, and it
+installs no ChromeDriver. A project with Node can use
 `npx @puppeteer/browsers install` or `npx playwright install` instead.
 
 **Platforms.** Linux with glibc and macOS, on x64 and arm64. On Windows, Composer refuses the
@@ -55,7 +57,9 @@ to run as root without `--allow-root` (see [Commands](#commands)).
 **Trust.** [Security](#security) lists seven rules and the code that implements each.
 [Limits of the security model](#limits-of-the-security-model) lists what the installer does not
 check. `composer test` requires PHPStan level max and 100 % type coverage; a CI job requires
-100 % line coverage.
+100 % line coverage. Each week, the workflow `chrome-for-testing` checks each pinned SHA-256
+against Chrome for Testing (see [The pin file](#the-pin-file)). The CI job `works-with` runs each
+tool under [Works with](#works-with).
 
 ![install checks the pinned archive and installs the browser, then refuses an archive with one byte added](https://github.com/sorge-it/cdp-browser-installer/raw/main/demo/output/demo.gif)
 
@@ -98,6 +102,22 @@ and a URL for each download. So `pin` computes the SHA-256 from its own download
 compared the MD5 that the storage sends in `x-goog-hash`. Commit the file, and review each change
 to it in the pull request, like a change to `composer.lock`: the pin is the point where you trust
 Google.
+
+The workflow [`chrome-for-testing`](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/chrome-for-testing.yml)
+checks the pin file of this repository. It runs each Monday, on demand, and on each pull request
+that changes `.chrome-version` or the workflow. It has two jobs:
+
+- `Chrome for Testing · SHA-256` runs `pin` again for the pinned version and compares each
+  SHA-256 with the pin file. It fails when `pin` fails or a SHA-256 differs.
+- `Chrome for Testing · Stable` fails when Chrome for Testing has a newer Stable than the pin.
+
+Its badge at the top of this file shows the last result on `main`. A failed SHA-256 job means that
+Chrome for Testing serves other bytes for the pinned version, or that a download failed; the log
+names the cause. Other bytes stop each install of that version with exit code 65. A failed Stable
+job means that a newer version exists, or that the job could not read the list of versions.
+[CONTRIBUTING.md](https://github.com/sorge-it/cdp-browser-installer/blob/main/CONTRIBUTING.md#when-the-chrome-for-testing-check-fails)
+gives the next step for each job. The workflow checks only the pin file of this repository. To
+update the pin file of your project, run `pin`.
 
 ## GitHub Actions
 
@@ -154,6 +174,79 @@ $binary = $installer->install(Pin::read('.chrome-version'), Platform::current())
 ```
 
 [API](#api) lists the classes and members that SemVer covers.
+
+## Works with
+
+The CI job [`works-with`](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/works-with.yml)
+runs each tool in this section with the browser of the pin file of this repository. For each
+tool, it installs the newest release, loads a `data:` page through the tool and reads the text of
+one element. It also checks that the browser reports the version of the pin file. It runs with
+PHP 8.5 on Linux x64, Linux arm64 and macOS arm64, not on macOS x64. It runs each Monday, on
+demand, after each merge, and on each pull request that changes the pin file, the installer or the
+job.
+
+Its badge at the top of this file shows the last result on `main`. Green means that each tool read
+the page on each of the three platforms. Each run lists in its summary the version of each tool,
+the browser and the platform. Red means that a step failed, and the name of the step tells which:
+each tool has a step with its name. The steps before them fail when a tool is not at its newest
+release, when `composer audit` finds an advisory, or when `deps` or `install` stops. When a new
+release of a tool fails, require the version of the last green run in your project. A tool that
+the job does not run is not in this section. The code of the job is in
+[`works-with/`](https://github.com/sorge-it/cdp-browser-installer/tree/main/works-with). A test
+of `composer test` keeps three parts of the examples below equal to the scripts of the job: the
+PHP lines that set up the tool, the `finally` block that stops the browser, and the command line.
+
+### chrome-php/chrome
+
+[`chrome-php/chrome`](https://packagist.org/packages/chrome-php/chrome) starts the browser from
+the path that `browser()` returns. It needs `ext-sockets`. The example turns off the sandbox on
+Linux, as the job does: on Ubuntu 24.04, AppArmor blocks the user namespaces of the sandbox (see
+[Run the browser](#run-the-browser)).
+
+```php
+use HeadlessChromium\BrowserFactory;
+use SorgeIt\CdpBrowserInstaller\Installer;
+use SorgeIt\CdpBrowserInstaller\Pin;
+use SorgeIt\CdpBrowserInstaller\Platform;
+
+$binary = Installer::fromEnvironment(getenv())->browser(Pin::FILE, Platform::current());
+$browser = new BrowserFactory($binary)->createBrowser(['noSandbox' => PHP_OS_FAMILY === 'Linux']);
+
+try {
+    $page = $browser->createPage();
+    // Drive the page.
+} finally {
+    $browser->close();
+}
+```
+
+### dmore/chrome-mink-driver
+
+[`dmore/chrome-mink-driver`](https://packagist.org/packages/dmore/chrome-mink-driver) connects to
+a browser that already runs; `dmore/behat-chrome-extension` uses this driver. The driver needs
+`ext-curl` and `ext-mbstring`. Start the browser with a debugging port and a profile directory.
+On Linux, add `--no-sandbox`, as the job does: on Ubuntu 24.04, AppArmor blocks the user
+namespaces of the sandbox (see [Run the browser](#run-the-browser)). The browser writes the port to
+`DevToolsActivePort` in the profile once it listens; wait for that file before the driver
+connects. Stop the browser after the tests.
+
+```sh
+"$(vendor/bin/cdp-browser path)" --headless --remote-debugging-port=9222 --user-data-dir="$PWD/.chrome-profile" &
+```
+
+```php
+use Behat\Mink\Session;
+use DMore\ChromeDriver\ChromeDriver;
+
+$session = new Session(new ChromeDriver('http://127.0.0.1:9222', null, 'http://localhost'));
+$session->start();
+
+try {
+    // Drive the page.
+} finally {
+    $session->stop();
+}
+```
 
 ## Comparison with Puppeteer, Playwright, Laravel Dusk and Symfony Panther
 

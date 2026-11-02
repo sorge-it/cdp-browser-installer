@@ -1,2 +1,6 @@
 /.tmp/
 /vendor/
+/works-with/.cache/
+/works-with/.chrome-version
+/works-with/composer.lock
+/works-with/vendor/
