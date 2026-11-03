@@ -24,9 +24,9 @@ env:
   SETUP_PHP_COMPOSER: composer:2.10.3@sha256:7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6
 
 jobs:
-  # `pin` of the pinned version again, into a pin file of its own: four downloads, 445 MiB, each
-  # checked as on the first pin. No cache: the download is the check. Red when `pin` fails or a
-  # SHA-256 differs from .chrome-version.
+  # `pin` of the pinned version again, into a pin file of its own: one download for each binary and
+  # each platform, each checked as on the first pin. No cache: the download is the check. Red when
+  # `pin` fails or a SHA-256 differs from .chrome-version.
   chrome-for-testing:
     name: Chrome for Testing · SHA-256
     runs-on: ubuntu-24.04
@@ -62,14 +62,16 @@ jobs:
             $pinned = SorgeIt\CdpBrowserInstaller\Pin::read($argv[1]);
             $served = SorgeIt\CdpBrowserInstaller\Pin::read($argv[2]);
             $differs = false;
-            foreach (SorgeIt\CdpBrowserInstaller\Platform::cases() as $platform) {
-                if ($pinned->hash($platform) !== $served->hash($platform)) {
-                    printf("::error::The SHA-256 of %s %s differs: %s pins %s, Chrome for Testing serves %s.\n", $pinned->version, $platform->value, $argv[1], $pinned->hash($platform), $served->hash($platform));
-                    $differs = true;
+            foreach (SorgeIt\CdpBrowserInstaller\Binary::cases() as $binary) {
+                foreach (SorgeIt\CdpBrowserInstaller\Platform::cases() as $platform) {
+                    if ($pinned->hash($binary, $platform) !== $served->hash($binary, $platform)) {
+                        printf("::error::The SHA-256 of %s %s %s differs: %s pins %s, Chrome for Testing serves %s.\n", $binary->value, $pinned->version, $platform->value, $argv[1], $pinned->hash($binary, $platform), $served->hash($binary, $platform));
+                        $differs = true;
+                    }
                 }
             }
             if (! $differs) {
-                printf("Chrome for Testing serves the pinned bytes of %s for each platform.\n", $pinned->version);
+                printf("Chrome for Testing serves the pinned bytes of %s for each binary and each platform.\n", $pinned->version);
             }
             exit($differs ? 1 : 0);
           ' .chrome-version "$RUNNER_TEMP/chrome-version"

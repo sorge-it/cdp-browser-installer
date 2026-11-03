@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SorgeIt\CdpBrowserInstaller\Tests;
 
 use RuntimeException;
+use SorgeIt\CdpBrowserInstaller\Binary;
 use SorgeIt\CdpBrowserInstaller\CommandLine;
 use SorgeIt\CdpBrowserInstaller\Download;
 use SorgeIt\CdpBrowserInstaller\Platform;
@@ -109,6 +110,18 @@ final readonly class FakeTools
     }
 
     /**
+     * The system's chromedriver, as `apk add chromium-chromedriver` brings it.
+     *
+     * @return string its absolute path
+     */
+    public function chromedriver(): string
+    {
+        return $this->add('chromedriver', <<<'PHP'
+            echo ($argv[1] ?? '') === '--version' ? "ChromeDriver 140.0.7339.80\n" : 'chromedriver '.implode(' ', array_slice($argv, 1))."\n";
+            PHP);
+    }
+
+    /**
      * Puts a tool first in `PATH`. The PHP body gets `$argv`, and `$root` for the files of the
      * fakes.
      *
@@ -129,7 +142,7 @@ final readonly class FakeTools
         $this->add($tool, sprintf('%s $process = proc_open([$root."/system/%s", ...array_slice($argv, 1)], [1 => STDOUT, 2 => STDERR], $pipes); $code = proc_close($process); %s exit($code);', $before, $tool, $after));
     }
 
-    public function serve(string $version, Platform $platform, string $archive): void
+    public function serve(string $version, Binary $binary, Platform $platform, string $archive): void
     {
         $directory = $this->root.'/served/'.$version.'/'.$platform->value;
 
@@ -137,7 +150,7 @@ final readonly class FakeTools
             mkdir($directory, 0o755, true);
         }
 
-        copy($archive, $directory.'/'.$platform->directory().'.zip');
+        copy($archive, $directory.'/'.$binary->directory($platform).'.zip');
     }
 
     /**

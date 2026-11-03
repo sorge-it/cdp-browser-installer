@@ -61,7 +61,23 @@ it('shows each tool with the lines that its script runs, and frees the browser a
 })->with([
     'chrome-php/chrome' => ['chrome-php/chrome', 'chrome-php.php', '$browser->close();'],
     'dmore/chrome-mink-driver' => ['dmore/chrome-mink-driver', 'chrome-mink-driver.php', '$session->stop();'],
+    'php-webdriver/webdriver' => ['php-webdriver/webdriver', 'php-webdriver.php', '$driver->quit();'],
+    'symfony/panther' => ['symfony/panther', 'panther.php', '$client->quit();'],
 ]);
+
+it('shows the methods of DuskTestCase for laravel/dusk as the job writes them', function (): void {
+    $script = (string) file_get_contents(dirname(__DIR__, 2).'/works-with/dusk/DuskTestCase.php');
+    $blocks = readmeBlocks(readmeSection('laravel/dusk'), 'php');
+    // The methods stand in the class body, one level in.
+    $methods = (string) preg_replace('/^(?=.)/m', '    ', scriptRegion($script));
+    preg_match_all('/^use [^;]+;$/m', $blocks[0] ?? '', $imports);
+
+    expect($blocks)->toHaveCount(1)
+        ->and($methods)->toContain('function prepare()')
+        ->and($blocks[0])->toContain("abstract class DuskTestCase extends BaseTestCase\n{\n".$methods."}\n")
+        ->and(array_values(array_filter($imports[0], static fn (string $import): bool => ! str_contains($script, $import."\n"))))->toBe([])
+        ->and($imports[0])->toHaveCount(substr_count($script, "\nuse "));
+});
 
 it('starts the browser for dmore/chrome-mink-driver as the command line of the README', function (): void {
     $script = (string) file_get_contents(dirname(__DIR__, 2).'/works-with/chrome-mink-driver.php');
@@ -72,8 +88,8 @@ it('starts the browser for dmore/chrome-mink-driver as the command line of the R
 
     // --no-sandbox depends on the system, so the README names it in its text, not in the command.
     expect($commands)->toHaveCount(1)
-        ->and($commands[0])->toStartWith('"$(vendor/bin/cdp-browser path)" ')
-        ->and($script)->toContain("exec('vendor/bin/cdp-browser path'")
+        ->and($commands[0])->toStartWith('"$(vendor/bin/cdp-browser path chrome-headless-shell)" ')
+        ->and($script)->toContain("exec('vendor/bin/cdp-browser path chrome-headless-shell'")
         ->and($shown[1])->toBe(['--headless', '--remote-debugging-port=9222', '--user-data-dir='])
         ->and($started[1])->toBe([...$shown[1], '--no-sandbox'])
         ->and($section)->toContain('`--no-sandbox`');

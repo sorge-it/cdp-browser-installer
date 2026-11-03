@@ -5,18 +5,20 @@ declare(strict_types=1);
 // The demo of the README: pin, install, path, a page through the browser, and a changed archive
 // of a cache that install refuses. Run through `make -C demo record`, in demo/app, with a network.
 
+use SorgeIt\CdpBrowserInstaller\Binary;
 use SorgeIt\CdpBrowserInstaller\Platform;
 
 require __DIR__.'/vendor/autoload.php';
 
-const VERSION = '156.0.8078.80';
+const VERSION = '157.0.8103.38';
 const CACHE = '.cache/cdp-browser';
 
 // The cache stays inside the demo app; ~/.cache is left alone.
 putenv('CDP_BROWSER_PATH='.CACHE);
 
 $platform = Platform::current();
-$archive = sprintf('%s/%s/%s/%s.zip', CACHE, VERSION, $platform->value, $platform->directory());
+$pair = sprintf('%s/%s/%s', CACHE, VERSION, $platform->value);
+$archive = sprintf('%s/%s.zip', $pair, Binary::ChromeHeadlessShell->directory($platform));
 $directory = (string) getcwd();
 
 printf("# %s, %s %s, PHP %s. The output shows the directory of the demo app as `.`.\n", gmdate('Y-m-d\TH:i\Z'), PHP_OS_FAMILY, php_uname('m'), PHP_VERSION);
@@ -26,16 +28,18 @@ $steps = [
     ['vendor/bin/cdp-browser pin '.VERSION, 0],
     ['cat .chrome-version', 0],
     ['vendor/bin/cdp-browser install', 0],
-    ['vendor/bin/cdp-browser path', 0],
+    ['vendor/bin/cdp-browser path chrome-headless-shell', 0],
+    ['vendor/bin/cdp-browser path chromedriver', 0],
     ['vendor/bin/cdp-browser install', 0],
-    ['"$(vendor/bin/cdp-browser path)" --version', 0],
-    ['"$(vendor/bin/cdp-browser path)" --dump-dom \'data:text/html,<p>ok</p>\'', 0],
-    // As on a new CI runner: a cache restored the archive, and the browser is missing.
-    [sprintf('rm -rf %1$s/%2$s %1$s/.sha256', dirname($archive), $platform->directory()), 0],
+    ['"$(vendor/bin/cdp-browser path chrome-headless-shell)" --version', 0],
+    ['"$(vendor/bin/cdp-browser path chromedriver)" --version', 0],
+    ['"$(vendor/bin/cdp-browser path chrome-headless-shell)" --dump-dom \'data:text/html,<p>ok</p>\'', 0],
+    // As on a new CI runner: a cache restored the archives, and the pair is missing.
+    [sprintf('rm -rf %1$s/*/ %1$s/.sha256-pair', $pair), 0],
     ['printf x >> '.$archive, 0],
     // The exit code of a ChecksumException.
     ['vendor/bin/cdp-browser install', 65],
-    ['ls '.dirname($archive), 0],
+    ['ls '.$pair, 0],
 ];
 
 // Each step is a line of the shell, printed first, then its exit code and its seconds.

@@ -17,7 +17,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 /**
  * @internal
  */
-#[AsCommand(name: 'deps', description: 'Install curl, unzip and the libraries of chrome-headless-shell through apt, or the chromium of Alpine through apk; run it as root')]
+#[AsCommand(name: 'deps', description: 'Install curl, unzip and the libraries of the pair through apt, or the chromium and chromium-chromedriver of Alpine through apk; run it as root')]
 final class DepsCommand extends Command
 {
     /**
@@ -35,7 +35,7 @@ final class DepsCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         if (in_array(($this->platform)(), [Platform::MacX64, Platform::MacArm64], true)) {
-            $output->writeln('macOS brings curl, unzip and every library chrome-headless-shell needs. Nothing to do.');
+            $output->writeln('macOS brings curl, unzip and every library of chrome-headless-shell and chromedriver. Nothing to do.');
 
             return self::SUCCESS;
         }

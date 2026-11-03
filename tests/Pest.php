@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use PHPUnit\Runner\CodeCoverage;
 use SebastianBergmann\CodeCoverage\Data\RawCodeCoverageData;
+use SorgeIt\CdpBrowserInstaller\Binary;
 use SorgeIt\CdpBrowserInstaller\ChecksumException;
 use SorgeIt\CdpBrowserInstaller\DownloadException;
 use SorgeIt\CdpBrowserInstaller\InstallerException;
@@ -138,29 +139,74 @@ function zipArchive(string $file, array $entries): string
 }
 
 /**
- * The binary in a test archive: it prints its name and its arguments.
+ * The browser in a test archive: it prints its name and its arguments.
  */
 const BROWSER = "#!/bin/sh\necho chrome-headless-shell \"\$@\"\n";
 
 /**
- * An archive of chrome-headless-shell for the platform.
+ * The chromedriver in a test archive: it prints its name and its arguments.
  */
-function browserArchive(string $file, Platform $platform): string
+const CHROMEDRIVER = "#!/bin/sh\necho chromedriver \"\$@\"\n";
+
+/**
+ * An archive of the binary for the platform, with a second file as Chrome for Testing has.
+ */
+function binaryArchive(string $file, Binary $binary, Platform $platform): string
 {
     return zipArchive($file, [
-        $platform->directory().'/chrome-headless-shell' => [BROWSER, 0o100755],
-        $platform->directory().'/icudtl.dat' => ['data', 0o100644],
+        $binary->path($platform) => [$binary === Binary::ChromeHeadlessShell ? BROWSER : CHROMEDRIVER, 0o100755],
+        $binary->directory($platform).'/LICENSE' => ['license', 0o100644],
     ]);
 }
 
-/**
- * A pin whose hash for every platform is the hash of the file.
- */
-function pinFor(string $version, string $archive): Pin
+function browserArchive(string $file, Platform $platform): string
 {
-    $hash = (string) hash_file('sha256', $archive);
+    return binaryArchive($file, Binary::ChromeHeadlessShell, $platform);
+}
 
-    return new Pin($version, array_fill_keys(array_map(static fn (Platform $platform): string => $platform->value, Platform::cases()), $hash));
+function chromedriverArchive(string $file, Platform $platform): string
+{
+    return binaryArchive($file, Binary::Chromedriver, $platform);
+}
+
+/**
+ * The stamp of an installed pair: one line for each binary, with the SHA-256 of its archive.
+ */
+function stampOf(Pin $pin, Platform $platform): string
+{
+    return sprintf("chrome-headless-shell %s\nchromedriver %s\n", $pin->hash(Binary::ChromeHeadlessShell, $platform), $pin->hash(Binary::Chromedriver, $platform));
+}
+
+/**
+ * A pin whose hash of each binary for the platform is the hash of its archive. Each other platform
+ * has a hash of its own for each binary, so that a step that takes the hash of another platform
+ * or binary fails.
+ */
+function pinFor(string $version, string $browserArchive, string $chromedriverArchive, Platform $platform): Pin
+{
+    $archives = [Binary::ChromeHeadlessShell->value => $browserArchive, Binary::Chromedriver->value => $chromedriverArchive];
+    $hashes = [];
+
+    foreach ($archives as $binary => $archive) {
+        foreach (Platform::cases() as $other) {
+            $hashes[$binary][$other->value] = $other === $platform ? (string) hash_file('sha256', $archive) : hash('sha256', $binary.' '.$other->value);
+        }
+    }
+
+    return new Pin($version, $hashes);
+}
+
+/**
+ * Writes functions into a namespace of the package and returns the file. The package calls each
+ * function of PHP without a namespace, so in a process of `php()` that requires the file first,
+ * a function of the file takes the place of the one of PHP.
+ */
+function functionsFile(string $directory, string $namespace, string $functions): string
+{
+    $file = $directory.'/functions-'.bin2hex(random_bytes(4)).'.php';
+    file_put_contents($file, sprintf("<?php\n\nnamespace %s;\n\n%s\n", $namespace, $functions));
+
+    return $file;
 }
 
 /**

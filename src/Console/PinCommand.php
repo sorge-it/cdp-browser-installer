@@ -6,6 +6,7 @@ namespace SorgeIt\CdpBrowserInstaller\Console;
 
 use Closure;
 use Override;
+use SorgeIt\CdpBrowserInstaller\Binary;
 use SorgeIt\CdpBrowserInstaller\ChecksumException;
 use SorgeIt\CdpBrowserInstaller\CommandLine;
 use SorgeIt\CdpBrowserInstaller\Download;
@@ -26,7 +27,7 @@ use Throwable;
 /**
  * @internal
  */
-#[AsCommand(name: 'pin', description: 'Download and check the archive of each platform, and write the version and each SHA-256 to the pin file')]
+#[AsCommand(name: 'pin', description: 'Download and check the archives of chrome-headless-shell and chromedriver for each platform, and write the version and each SHA-256 to the pin file')]
 final class PinCommand extends Command
 {
     /**
@@ -66,16 +67,18 @@ final class PinCommand extends Command
         $failure = null;
 
         try {
-            foreach (Platform::cases() as $platform) {
-                $output->writeln(sprintf('Download %s', Download::url($version, $platform)));
-                new Download($commandLine)->to($version, $platform, $file, $headers);
-                $this->checkMd5($file, is_file($headers) ? (string) file_get_contents($headers) : '', $platform, $output);
-                $hashes[$platform->value] = (string) hash_file('sha256', $file);
+            foreach (Binary::cases() as $binary) {
+                foreach (Platform::cases() as $platform) {
+                    $output->writeln(sprintf('Download %s', Download::url($version, $binary, $platform)));
+                    new Download($commandLine)->to($version, $binary, $platform, $file, $headers);
+                    $this->checkMd5($file, is_file($headers) ? $this->read($headers, static fn (): string|false => file_get_contents($headers)) : '', $binary, $platform, $output);
+                    $hashes[$binary->value][$platform->value] = $this->read($file, static fn (): string|false => hash_file('sha256', $file));
 
-                // A response with status 200 can also be an error page. Only an archive that
-                // `install` unpacks gets a pin. After a failure, the tree goes with the directory.
-                new Unpack($commandLine)->to($file, $platform, $directory.'/tree');
-                $commandLine->remove([$directory.'/tree'], null);
+                    // A response with status 200 can also be an error page. Only an archive that
+                    // `install` unpacks gets a pin. After a failure, the tree goes with the directory.
+                    new Unpack($commandLine)->to($file, $binary, $platform, $directory.'/tree');
+                    $commandLine->remove([$directory.'/tree'], null);
+                }
             }
         } catch (Throwable $throwable) {
             $failure = $throwable;
@@ -92,7 +95,24 @@ final class PinCommand extends Command
     }
 
     /**
-     * Before the four downloads, the checks that `Pin::write()` would fail after them: the pin
+     * A file of the download that cannot be read stops `pin` as a cause of the file system: no
+     * checksum was compared, so it is no `ChecksumException`.
+     *
+     * @param  Closure(): (string|false)  $read
+     */
+    private function read(string $file, Closure $read): string
+    {
+        $content = Files::quietly($read);
+
+        if ($content === false) {
+            throw new InstallerException(sprintf('The file %s of the download could not be read; no pin was written.', $file));
+        }
+
+        return $content;
+    }
+
+    /**
+     * Before the downloads, the checks that `Pin::write()` would fail after them: the pin
      * file is a file or missing, and its directory exists and takes a new file.
      */
     private function checkPinFile(string $pinFile): void
@@ -113,20 +133,20 @@ final class PinCommand extends Command
      * The MD5 of the storage finds a broken download. It comes from the same server as the
      * archive, so it finds no changed source; without it, the SHA-256 alone checks `install`.
      */
-    private function checkMd5(string $file, string $headers, Platform $platform, OutputInterface $output): void
+    private function checkMd5(string $file, string $headers, Binary $binary, Platform $platform, OutputInterface $output): void
     {
         $expected = Download::md5($headers);
 
         if ($expected === null) {
-            $output->writeln(sprintf('The storage sent no MD5 for %s; pin compared none. The SHA-256 in the pin still checks install.', $platform->value));
+            $output->writeln(sprintf('The storage sent no MD5 for %s on %s; pin compared none. The SHA-256 in the pin still checks install.', $binary->value, $platform->value));
 
             return;
         }
 
-        $actual = (string) md5_file($file, true);
+        $actual = $this->read($file, static fn (): string|false => md5_file($file, true));
 
         if ($actual !== $expected) {
-            throw new ChecksumException(sprintf('The MD5 of the download for %s is %s, the storage sent %s in x-goog-hash. The download is broken; no pin was written.', $platform->value, base64_encode($actual), base64_encode($expected)));
+            throw new ChecksumException(sprintf('The MD5 of the download of %s for %s is %s, the storage sent %s in x-goog-hash. The download is broken; no pin was written.', $binary->value, $platform->value, base64_encode($actual), base64_encode($expected)));
         }
     }
 }

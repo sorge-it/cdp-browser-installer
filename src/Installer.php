@@ -11,12 +11,21 @@ use SplFileObject;
 use Throwable;
 
 /**
- * Puts chrome-headless-shell under `<cache>/<version>/<platform>/`, or uses a browser the system
- * brings. The archive stays beside the browser. Its SHA-256 is checked before it is unpacked.
+ * Puts the pair of chrome-headless-shell and chromedriver under `<cache>/<version>/<platform>/`,
+ * or uses a pair the system brings. Each archive stays beside its tree. Its SHA-256 is checked
+ * before it is unpacked.
  */
 final readonly class Installer
 {
-    public const string OWN_BROWSER = 'CDP_BROWSER_BINARY';
+    /**
+     * The system's browser, such as Alpine's chromium. Only together with `OWN_CHROMEDRIVER`.
+     */
+    public const string OWN_CHROME = 'CDP_BROWSER_CHROME';
+
+    /**
+     * The system's chromedriver. Only together with `OWN_CHROME`.
+     */
+    public const string OWN_CHROMEDRIVER = 'CDP_BROWSER_CHROMEDRIVER';
 
     /**
      * The seconds of each tool, such as the whole download by curl.
@@ -29,14 +38,20 @@ final readonly class Installer
     public const string LOCK_TIMEOUT = 'CDP_BROWSER_LOCK_TIMEOUT';
 
     /**
-     * A file beside the browser that holds the SHA-256 of the archive it was unpacked from.
+     * A file beside the pair with one line for each binary: the SHA-256 of the archive it was
+     * unpacked from.
      */
-    private const string STAMP = '.sha256';
+    private const string STAMP = '.sha256-pair';
+
+    /**
+     * The variable of release 1.x for the system's browser. Its value is never used.
+     */
+    private const string RELEASE_1_BROWSER = 'CDP_BROWSER_BINARY';
 
     /**
      * The seconds after which a leftover counts as one of a stopped run; curl stops below 1 KiB/s
-     * for 60 s. A `.unpack-*` directory gets a new mtime only when made, at its staging directory
-     * and at the move. Without a working `flock()`, a second run can remove it during a slow check.
+     * for 60 s. Without a working `flock()`, a second run can remove a file of a run whose step
+     * takes longer; that run then stops with exit code 1.
      */
     private const int STOPPED = 120;
 
@@ -47,15 +62,15 @@ final readonly class Installer
     private bool $musl;
 
     /**
-     * @param  string|null  $cache  an absolute directory, not the root, without a character that unzip reads as a pattern; `null` for an installer that only checks the system's browser
-     * @param  string|null  $ownBrowser  the system's browser, such as Alpine's chromium; then nothing is downloaded
+     * @param  string|null  $cache  an absolute directory, not the root, without a character that unzip reads as a pattern; `null` for an installer that only checks the system's pair
+     * @param  Binaries|null  $own  the system's pair, such as Alpine's chromium and chromedriver; then nothing is downloaded
      * @param  bool|null  $musl  whether Linux runs on musl, where Chrome for Testing does not start; `null` detects it
      * @param  int  $lockTimeout  how many seconds an install waits for another one in the same directory; `0` not to wait
      */
     public function __construct(
         private CommandLine $commandLine,
         ?string $cache,
-        private ?string $ownBrowser = null,
+        private ?Binaries $own = null,
         ?bool $musl = null,
         private int $lockTimeout = self::LOCK_SECONDS,
     ) {
@@ -68,21 +83,35 @@ final readonly class Installer
     }
 
     /**
-     * The installer as the environment configures it: `CDP_BROWSER_BINARY`, `CDP_BROWSER_PATH`,
-     * `XDG_CACHE_HOME`, `HOME`, `CDP_BROWSER_TIMEOUT` and `CDP_BROWSER_LOCK_TIMEOUT`. A test
-     * tool starts here.
+     * The installer as the environment configures it: `CDP_BROWSER_CHROME`,
+     * `CDP_BROWSER_CHROMEDRIVER`, `CDP_BROWSER_PATH`, `XDG_CACHE_HOME`, `HOME`,
+     * `CDP_BROWSER_TIMEOUT` and `CDP_BROWSER_LOCK_TIMEOUT`. A test tool starts here.
      *
      * @param  array<string, string>  $environment
      * @param  CommandLine  $commandLine  its timeout is the default of `CDP_BROWSER_TIMEOUT`
      */
     public static function fromEnvironment(array $environment, CommandLine $commandLine = new CommandLine, ?bool $musl = null): self
     {
-        $own = $environment[self::OWN_BROWSER] ?? '';
+        // Without this stop, a pipeline that sets it gets the pinned pair and no message.
+        if (($environment[self::RELEASE_1_BROWSER] ?? '') !== '') {
+            throw new InstallerException(sprintf("%s is set, but release 2.x does not read it. Set %s and %s for the system's pair, such as %s and %s, or unset %s for the pinned pair.", self::RELEASE_1_BROWSER, self::OWN_CHROME, self::OWN_CHROMEDRIVER, Binary::ChromeHeadlessShell->alpinePath(), Binary::Chromedriver->alpinePath(), self::RELEASE_1_BROWSER));
+        }
+
+        $browser = $environment[self::OWN_CHROME] ?? '';
+        $chromedriver = $environment[self::OWN_CHROMEDRIVER] ?? '';
+
+        // A browser of the system and a pinned chromedriver, or the reverse, can differ in version.
+        if (($browser === '') !== ($chromedriver === '')) {
+            [$set, $missing] = $browser === '' ? [self::OWN_CHROMEDRIVER, self::OWN_CHROME] : [self::OWN_CHROME, self::OWN_CHROMEDRIVER];
+
+            throw new InstallerException(sprintf('%s is set, but %s is not. Set both for the pair of the system, such as %s and %s, or neither for the pinned pair.', $set, $missing, Binary::ChromeHeadlessShell->alpinePath(), Binary::Chromedriver->alpinePath()));
+        }
+
         $commandLine = Environment::applyTimeout($environment, $commandLine);
 
-        // The system's browser needs no cache directory, and so no HOME, and takes no lock.
-        if ($own !== '') {
-            return new self($commandLine, null, $own, $musl);
+        // The system's pair needs no cache directory, and so no HOME, and takes no lock.
+        if ($browser !== '') {
+            return new self($commandLine, null, new Binaries($browser, $chromedriver), $musl);
         }
 
         return new self($commandLine, self::cache($environment), null, $musl, Environment::seconds($environment, self::LOCK_TIMEOUT, self::LOCK_SECONDS) ?? self::LOCK_SECONDS);
@@ -100,9 +129,9 @@ final readonly class Installer
         return Environment::cache($environment);
     }
 
-    public function ownBrowser(): ?string
+    public function ownBinaries(): ?Binaries
     {
-        return $this->ownBrowser;
+        return $this->own;
     }
 
     /**
@@ -116,175 +145,227 @@ final readonly class Installer
     }
 
     /**
-     * The browser to start: the system's browser, checked, or the pinned one, installed if missing.
-     * One call for a test tool.
+     * The pair to start: the system's pair, checked, or the pinned one, installed if missing. One
+     * call for a test tool.
      *
      * @param  (Closure(string): void)|null  $onDownload  gets the URL before each download
      */
-    public function browser(string $pinFile, Platform $platform, ?Closure $onDownload = null): string
+    public function binaries(string $pinFile, Platform $platform, ?Closure $onDownload = null): Binaries
     {
-        return $this->ownBrowser === null ? $this->install(Pin::read($pinFile), $platform, $onDownload) : $this->checkOwnBrowser($this->ownBrowser);
-    }
+        if ($this->own instanceof Binaries) {
+            return $this->checkOwn($this->own);
+        }
 
-    public function binary(Pin $pin, Platform $platform): string
-    {
-        return $this->directory($pin, $platform).'/'.$platform->binary();
-    }
+        // Before the pin file: on musl, a new pin file leads only to the refusal of `install()`.
+        if ($this->musl) {
+            throw new InstallerException(Libc::REFUSAL);
+        }
 
-    public function isInstalled(Pin $pin, Platform $platform): bool
-    {
-        $stamp = $this->directory($pin, $platform).'/'.self::STAMP;
-
-        return is_file($this->binary($pin, $platform))
-            && is_file($stamp)
-            && @file_get_contents($stamp) === $pin->hash($platform);
+        return $this->install(Pin::read($pinFile), $platform, $onDownload);
     }
 
     /**
-     * Unpacks the archive if the browser is missing or came from another archive. A new download
-     * and an archive in the cache are each checked once, in a file of this run, and unpacked from
-     * that file. An installed browser needs no lock, and so no write access to the cache.
+     * Where the pinned pair is, or goes, in the cache.
+     */
+    public function paths(Pin $pin, Platform $platform): Binaries
+    {
+        $directory = $this->directory($pin, $platform);
+
+        return new Binaries(
+            $directory.'/'.Binary::ChromeHeadlessShell->path($platform),
+            $directory.'/'.Binary::Chromedriver->path($platform),
+        );
+    }
+
+    /**
+     * Whether both binaries are there, and the stamp names the archives of this pin.
+     */
+    public function isInstalled(Pin $pin, Platform $platform): bool
+    {
+        $paths = $this->paths($pin, $platform);
+        $stamp = $this->directory($pin, $platform).'/'.self::STAMP;
+
+        return is_file($paths->path(Binary::ChromeHeadlessShell))
+            && is_file($paths->path(Binary::Chromedriver))
+            && is_file($stamp)
+            && Files::quietly(static fn (): string|false => file_get_contents($stamp)) === $this->stamp($pin, $platform);
+    }
+
+    /**
+     * Unpacks both binaries when the pair is not installed, one after the other. Each archive, a
+     * new download or one in the cache, is checked once in a file of this run and unpacked from
+     * that file. An installed pair needs no lock, and so no write access to the cache.
      *
      * @param  (Closure(string): void)|null  $onDownload  gets the URL before each download
-     * @return string the path of the binary
      */
-    public function install(Pin $pin, Platform $platform, ?Closure $onDownload = null): string
+    public function install(Pin $pin, Platform $platform, ?Closure $onDownload = null): Binaries
     {
         if ($this->musl) {
             throw new InstallerException(Libc::REFUSAL);
         }
 
         if ($this->isInstalled($pin, $platform)) {
-            return $this->binary($pin, $platform);
+            return $this->paths($pin, $platform);
         }
 
         $directory = $this->directory($pin, $platform);
-        $archive = $directory.'/'.$platform->directory().'.zip';
         Files::makeDirectory($directory);
         $lock = $this->lock($directory);
 
         try {
-            $this->removeLeftovers($directory, basename($archive));
+            $this->removeLeftovers($directory, $platform);
 
             if (! $this->isInstalled($pin, $platform)) {
-                $this->installArchive($archive, $directory, $pin, $platform, $onDownload);
+                foreach (Binary::cases() as $binary) {
+                    $this->installArchive($binary, $directory, $pin, $platform, $onDownload);
+                }
+
+                if (! Files::write($directory.'/'.self::STAMP, $this->stamp($pin, $platform))) {
+                    throw new InstallerException(sprintf('The stamp in %s could not be written.', $directory));
+                }
             }
         } finally {
             $lock->flock(LOCK_UN);
         }
 
-        return $this->binary($pin, $platform);
+        return $this->paths($pin, $platform);
+    }
+
+    /**
+     * One line for each binary, with the SHA-256 of its archive.
+     */
+    private function stamp(Pin $pin, Platform $platform): string
+    {
+        $lines = '';
+
+        foreach (Binary::cases() as $binary) {
+            $lines .= $binary->value.' '.$pin->hash($binary, $platform)."\n";
+        }
+
+        return $lines;
     }
 
     /**
      * Removes what a run leaves when it ends before its `finally`, as after SIGKILL: a download, a
      * temporary or an old tree, a new stamp. An old tree of a run that still runs goes either way.
      */
-    private function removeLeftovers(string $directory, string $archive): void
+    private function removeLeftovers(string $directory, Platform $platform): void
     {
-        $pattern = '/\A(?:'.preg_quote($archive, '/').'\.part-|\.unpack-|\.old-|'.preg_quote(self::STAMP, '/').'\.)[0-9a-f]{8}\z/';
+        $archives = array_map(static fn (Binary $binary): string => preg_quote($binary->directory($platform).'.zip', '/').'\.part-', Binary::cases());
+        $pattern = '/\A(?:'.implode('|', $archives).'|\.unpack-|\.old-|'.preg_quote(self::STAMP, '/').'\.)[0-9a-f]{8}\z/';
 
-        foreach (@scandir($directory) ?: [] as $entry) {
+        foreach (Files::quietly(static fn (): array|false => scandir($directory)) ?: [] as $entry) {
             $path = $directory.'/'.$entry;
 
             // Another run without a working lock may remove the same path first.
-            if (preg_match($pattern, $entry) !== 1 || (int) @filemtime($path) >= time() - self::STOPPED) {
+            if (preg_match($pattern, $entry) !== 1 || (int) Files::quietly(static fn (): int|false => filemtime($path)) >= time() - self::STOPPED) {
                 continue;
             }
 
             if (is_dir($path) && ! is_link($path)) {
                 $this->commandLine->run(['rm', '-rf', '--', $path]);
-            } elseif (! @unlink($path) && file_exists($path)) {
+            } elseif (! Files::quietly(static fn (): bool => unlink($path)) && file_exists($path)) {
                 throw new InstallerException(sprintf('The leftover %s could not be removed.', $path));
             }
         }
     }
 
+    /**
+     * Without a working `flock()`, a second run can remove a file of this run by its age.
+     */
     private function move(string $from, string $to): void
     {
-        if (! @rename($from, $to)) {
-            throw new InstallerException(sprintf('%s could not be moved to %s.', $from, $to));
+        if (! Files::quietly(static fn (): bool => rename($from, $to))) {
+            throw new InstallerException(sprintf('%s could not be moved to %s.%s', $from, $to, file_exists($from) ? '' : ' Another install removed it, as where flock() does not exclude it. Run `cdp-browser install` again.'));
         }
     }
 
     /**
-     * Checks and unpacks the archive in a file of this run, then puts it back for the cache.
-     * Without a working `flock()`, as on a bind mount of Docker Desktop, a second run can put
-     * another archive at the path of the cache meanwhile; this run still unpacks what it checked.
+     * Checks and unpacks the archive of the binary in a file of this run, then puts it back for
+     * the cache. Without a working `flock()`, a second run can put another archive at the path of
+     * the cache meanwhile; this run still unpacks what it checked.
      *
      * @param  (Closure(string): void)|null  $onDownload
      */
-    private function installArchive(string $archive, string $directory, Pin $pin, Platform $platform, ?Closure $onDownload): void
+    private function installArchive(Binary $binary, string $directory, Pin $pin, Platform $platform, ?Closure $onDownload): void
     {
+        $archive = $directory.'/'.$binary->directory($platform).'.zip';
         $own = $archive.'.part-'.bin2hex(random_bytes(4));
 
         try {
-            if (is_file($archive) && @rename($archive, $own)) {
-                // A second run without a working lock removes a file of this name by its age, and
-                // a rename keeps the age of the file that a cache restored.
-                touch($own);
-                $this->verify($own, $archive, $pin->hash($platform));
-            } elseif (file_exists($archive)) {
-                throw new InstallerException(sprintf('%s could not be moved to %s.', $archive, $own));
-            } else {
-                if ($onDownload instanceof Closure) {
-                    $onDownload(Download::url($pin->version, $platform));
-                }
-
-                new Download($this->commandLine)->to($pin->version, $platform, $own);
-                $this->verify($own, $archive, $pin->hash($platform));
+            // A second run without a working lock removes a `.part-*` file by its age, and a rename
+            // keeps the old age of a file that a cache restored. So the time is set before the rename.
+            if (is_file($archive) && ! Files::quietly(static fn (): bool => touch($archive))) {
+                throw new InstallerException(sprintf('The archive %s of the cache could not get a new modification time. Remove it; the next `cdp-browser install` downloads it again.', $archive));
             }
 
+            // Without an archive in the cache, or when another run took it first, this run downloads.
+            if (! is_file($archive) || ! Files::quietly(static fn (): bool => rename($archive, $own))) {
+                if (file_exists($archive)) {
+                    throw new InstallerException(sprintf('%s could not be moved to %s.', $archive, $own));
+                }
+
+                if ($onDownload instanceof Closure) {
+                    $onDownload(Download::url($pin->version, $binary, $platform));
+                }
+
+                new Download($this->commandLine)->to($pin->version, $binary, $platform, $own);
+            }
+
+            $this->verify($own, $archive, $pin->hash($binary, $platform));
+
             try {
-                $this->unpack($own, $directory, $pin, $platform);
+                $this->unpack($own, $binary, $directory, $pin, $platform);
             } catch (Throwable $throwable) {
                 // The checked archive stays in the cache, also when its unpack fails.
-                @rename($own, $archive);
+                Files::quietly(static fn (): bool => rename($own, $archive));
 
                 throw $throwable;
             }
 
             $this->move($own, $archive);
-
-            if (! Files::write($directory.'/'.self::STAMP, $pin->hash($platform))) {
-                throw new InstallerException(sprintf('The stamp in %s could not be written.', $directory));
-            }
         } finally {
             // A failed removal does not replace the first error; the next run removes the file.
             if (is_file($own)) {
-                @unlink($own);
+                Files::quietly(static fn (): bool => unlink($own));
             }
         }
     }
 
     private function directory(Pin $pin, Platform $platform): string
     {
-        $cache = $this->cache ?? throw new InstallerException("This installer has no cache directory: it was made for the system's browser.");
+        $cache = $this->cache ?? throw new InstallerException("This installer has no cache directory: it was made for the system's pair.");
 
         return $cache.'/'.$pin->version.'/'.$platform->value;
     }
 
     /**
-     * The system's browser must be an absolute path to a program that answers `--version`.
+     * Each binary of the system's pair must be an absolute path to a program that answers
+     * `--version`.
      */
-    private function checkOwnBrowser(string $browser): string
+    private function checkOwn(Binaries $own): Binaries
     {
-        if (! str_starts_with($browser, '/')) {
-            throw new InstallerException(sprintf('%s must be an absolute path, not `%s`.', self::OWN_BROWSER, $browser));
+        foreach (Binary::cases() as $binary) {
+            $path = $own->path($binary);
+            $variable = $binary->variable();
+
+            if (! str_starts_with($path, '/')) {
+                throw new InstallerException(sprintf('%s must be an absolute path, not `%s`.', $variable, $path));
+            }
+
+            // Before `run()`: its message for a missing tool names `deps`, which installs nothing at this path.
+            if (! $this->commandLine->has($path)) {
+                throw new InstallerException(sprintf('%1$s `%2$s` is not an executable file. Set %1$s to the path of an existing binary, such as %3$s.', $variable, $path, $binary->alpinePath()));
+            }
+
+            try {
+                $this->commandLine->run([$path, '--version']);
+            } catch (InstallerException $installerException) {
+                throw new InstallerException(sprintf('%s `%s` does not answer --version. %s', $variable, $path, $installerException->getMessage()), $installerException->getPrevious());
+            }
         }
 
-        // Before `run()`: its message for a missing tool names `deps`, which installs no browser at this path.
-        if (! $this->commandLine->has($browser)) {
-            throw new InstallerException(sprintf('%1$s `%2$s` is not an executable file. Set %1$s to the path of an existing browser binary, such as /usr/bin/chromium.', self::OWN_BROWSER, $browser));
-        }
-
-        try {
-            $this->commandLine->run([$browser, '--version']);
-        } catch (InstallerException $installerException) {
-            throw new InstallerException(sprintf('%s `%s` does not answer --version. %s', self::OWN_BROWSER, $browser, $installerException->getMessage()), $installerException->getPrevious());
-        }
-
-        return $browser;
+        return $own;
     }
 
     /**
@@ -321,7 +402,7 @@ final readonly class Installer
      */
     private function verify(string $file, string $archive, string $expected): void
     {
-        $handle = @fopen($file, 'rb');
+        $handle = Files::quietly(static fn (): mixed => fopen($file, 'rb'));
 
         if ($handle === false) {
             throw new InstallerException(sprintf('The archive %s could not be read.', $archive));
@@ -330,8 +411,12 @@ final readonly class Installer
         $context = hash_init('sha256');
 
         try {
-            // Blocks of 1 MiB.
-            while (($block = fread($handle, 1_048_576)) !== false && $block !== '') {
+            // Blocks of 1 MiB. A failed read ends with an error, not with the hash of part of the file.
+            while (($block = Files::quietly(static fn (): string|false => fread($handle, 1_048_576))) !== '') {
+                if ($block === false) {
+                    throw new InstallerException(sprintf('The archive %s could not be read.', $archive));
+                }
+
                 hash_update($context, $block);
             }
         } finally {
@@ -341,48 +426,48 @@ final readonly class Installer
         $actual = hash_final($context);
 
         if ($actual !== $expected) {
-            throw new ChecksumException(sprintf('The SHA-256 of %s is %s, the pin expects %s. The archive is deleted and nothing was unpacked.', $archive, $actual, $expected));
+            throw new ChecksumException(sprintf('The SHA-256 of %s is %s, the pin expects %s. The archive is deleted and was not unpacked.', $archive, $actual, $expected));
         }
     }
 
     /**
-     * Unpacks the checked archive into a new directory beside the target. The old browser moves
-     * aside, the new one moves in, then the old one is removed. A browser that still runs from
+     * Unpacks the checked archive into a new directory beside the target. The old tree moves
+     * aside, the new one moves in, then the old one is removed. A binary that still runs from
      * the old tree keeps only the files it has open.
      */
-    private function unpack(string $archive, string $directory, Pin $pin, Platform $platform): void
+    private function unpack(string $archive, Binary $binary, string $directory, Pin $pin, Platform $platform): void
     {
         $suffix = bin2hex(random_bytes(4));
         $temporary = $directory.'/.unpack-'.$suffix;
         $old = $directory.'/.old-'.$suffix;
-        $target = $directory.'/'.$platform->directory();
+        $target = $directory.'/'.$binary->directory($platform);
         $failure = null;
 
         try {
             Files::makeDirectory($temporary);
-            new Unpack($this->commandLine)->to($archive, $platform, $temporary);
+            new Unpack($this->commandLine)->to($archive, $binary, $platform, $temporary);
 
-            // Where flock() does not exclude, another run may have moved in the same browser while
+            // Where flock() does not exclude, another run may have moved in the same pair while
             // this one unpacked. A test may run it already, so it stays, and this tree goes.
             if ($this->isInstalled($pin, $platform)) {
                 return;
             }
 
-            $new = $temporary.'/'.$platform->directory();
+            $new = $temporary.'/'.$binary->directory($platform);
             $stamp = $directory.'/'.self::STAMP;
 
-            // Without the stamp, a failure from here on leaves a browser the next run unpacks again.
-            if (is_file($stamp) && ! @unlink($stamp) && file_exists($stamp)) {
+            // Without the stamp, a failure from here on leaves a pair the next run unpacks again.
+            if (is_file($stamp) && ! Files::quietly(static fn (): bool => unlink($stamp)) && file_exists($stamp)) {
                 throw new InstallerException(sprintf('The stamp in %s could not be removed.', $directory));
             }
 
             // Where flock() does not exclude, another run moves the same paths. It moves in only a
             // tree of the checked archive, so a path that it moved counts as moved.
-            if (is_dir($target) && ! @rename($target, $old) && file_exists($target)) {
+            if (is_dir($target) && ! Files::quietly(static fn (): bool => rename($target, $old)) && file_exists($target)) {
                 throw new InstallerException(sprintf('%s could not be moved to %s.', $target, $old));
             }
 
-            if (! @rename($new, $target) && ! is_dir($target)) {
+            if (! Files::quietly(static fn (): bool => rename($new, $target)) && ! is_dir($target)) {
                 throw new InstallerException(sprintf('%s could not be moved to %s.', $new, $target));
             }
         } catch (Throwable $throwable) {

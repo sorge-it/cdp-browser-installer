@@ -1,55 +1,77 @@
-# 2026-11-02T11:19Z, Darwin arm64, PHP 8.5.6. The output shows the directory of the demo app as `.`.
+# 2026-11-04T09:22Z, Darwin arm64, PHP 8.5.6. The output shows the directory of the demo app as `.`.
 
-$ vendor/bin/cdp-browser pin 156.0.8078.80
-Download https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.80/linux64/chrome-headless-shell-linux64.zip
-Download https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.80/linux-arm64/chrome-headless-shell-linux-arm64.zip
-Download https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.80/mac-x64/chrome-headless-shell-mac-x64.zip
-Download https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.80/mac-arm64/chrome-headless-shell-mac-arm64.zip
-Wrote 156.0.8078.80 to .chrome-version. Review the change before you commit it.
-[exit 0, 43.8 s]
+$ vendor/bin/cdp-browser pin 157.0.8103.38
+Download https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.38/linux64/chrome-headless-shell-linux64.zip
+Download https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.38/linux-arm64/chrome-headless-shell-linux-arm64.zip
+Download https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.38/mac-x64/chrome-headless-shell-mac-x64.zip
+Download https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.38/mac-arm64/chrome-headless-shell-mac-arm64.zip
+Download https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.38/linux64/chromedriver-linux64.zip
+Download https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.38/linux-arm64/chromedriver-linux-arm64.zip
+Download https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.38/mac-x64/chromedriver-mac-x64.zip
+Download https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.38/mac-arm64/chromedriver-mac-arm64.zip
+Wrote 157.0.8103.38 to .chrome-version. Review the change before you commit it.
+[exit 0, 69.5 s]
 
 $ cat .chrome-version
 {
-    "version": "156.0.8078.80",
-    "sha256": {
-        "linux64": "547dcd374e02961bf998f6046a267644f8502225c36bb78ca307dab32a0b3eb4",
-        "linux-arm64": "5bb6a00a4285c13303d3f72c5afdb70f144ea7a93eed462365a52b69631c9607",
-        "mac-x64": "535d417d9034cbd11e7dacd1a71aa3d6e1b525e6d5dcd2671eb2532f01481228",
-        "mac-arm64": "ea615baa2e9caf0d02d1898a6562b5f8fa9c35239707dae0f592178df5b986ac"
+    "version": "157.0.8103.38",
+    "chrome-headless-shell": {
+        "linux64": "deafffa74660b34853a4119c361fd427ac8c9fcb62db51ddb8a797cd83a4ba2d",
+        "linux-arm64": "b9b910a57b2a15eb3e55000a2339f93a973934a413ebfc6e585a50ec6c42fd6c",
+        "mac-x64": "79821745d0a72d2ba752d981284ed0a9e6fa320dad133596941a17dba6186de3",
+        "mac-arm64": "e6a6b13551aa12f951d0891d79282606b13742837c8fa0505e1272bae116ce82"
+    },
+    "chromedriver": {
+        "linux64": "329525fa0bf02be19794de1e9475772ef64695e0456f142888bd70df3147dc1e",
+        "linux-arm64": "8166fad77893cb095a45678f29ebec7ea14a8ac89364d28d52176a6fd4b30262",
+        "mac-x64": "7725504324ce8e8e03f78392ecf288890e082d215f619edd87a2dc1235e780a4",
+        "mac-arm64": "e59394fda6a05067362c225678e185e46e473cebea1593025deb2b2641b75688"
     }
 }
 [exit 0, 0.0 s]
 
 $ vendor/bin/cdp-browser install
-Download https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.80/mac-arm64/chrome-headless-shell-mac-arm64.zip
-chrome-headless-shell for mac-arm64 is at ./.cache/cdp-browser/156.0.8078.80/mac-arm64/chrome-headless-shell-mac-arm64/chrome-headless-shell.
-[exit 0, 9.4 s]
+Download https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.38/mac-arm64/chrome-headless-shell-mac-arm64.zip
+Download https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.38/mac-arm64/chromedriver-mac-arm64.zip
+chrome-headless-shell for mac-arm64 is at ./.cache/cdp-browser/157.0.8103.38/mac-arm64/chrome-headless-shell-mac-arm64/chrome-headless-shell.
+chromedriver for mac-arm64 is at ./.cache/cdp-browser/157.0.8103.38/mac-arm64/chromedriver-mac-arm64/chromedriver.
+[exit 0, 13.2 s]
 
-$ vendor/bin/cdp-browser path
-./.cache/cdp-browser/156.0.8078.80/mac-arm64/chrome-headless-shell-mac-arm64/chrome-headless-shell
+$ vendor/bin/cdp-browser path chrome-headless-shell
+./.cache/cdp-browser/157.0.8103.38/mac-arm64/chrome-headless-shell-mac-arm64/chrome-headless-shell
+[exit 0, 0.0 s]
+
+$ vendor/bin/cdp-browser path chromedriver
+./.cache/cdp-browser/157.0.8103.38/mac-arm64/chromedriver-mac-arm64/chromedriver
 [exit 0, 0.0 s]
 
 $ vendor/bin/cdp-browser install
-chrome-headless-shell for mac-arm64 is at ./.cache/cdp-browser/156.0.8078.80/mac-arm64/chrome-headless-shell-mac-arm64/chrome-headless-shell.
+chrome-headless-shell for mac-arm64 is at ./.cache/cdp-browser/157.0.8103.38/mac-arm64/chrome-headless-shell-mac-arm64/chrome-headless-shell.
+chromedriver for mac-arm64 is at ./.cache/cdp-browser/157.0.8103.38/mac-arm64/chromedriver-mac-arm64/chromedriver.
 [exit 0, 0.0 s]
 
-$ "$(vendor/bin/cdp-browser path)" --version
-Google Chrome for Testing 156.0.8078.80
-[exit 0, 1.5 s]
+$ "$(vendor/bin/cdp-browser path chrome-headless-shell)" --version
+Google Chrome for Testing 157.0.8103.38
+[exit 0, 1.7 s]
 
-$ "$(vendor/bin/cdp-browser path)" --dump-dom 'data:text/html,<p>ok</p>'
+$ "$(vendor/bin/cdp-browser path chromedriver)" --version
+ChromeDriver 157.0.8103.38 (a733b5afbb3ba618844ff8876b89ad1a774b2f18-refs/branch-heads/8103@{#1034})
+[exit 0, 0.6 s]
+
+$ "$(vendor/bin/cdp-browser path chrome-headless-shell)" --dump-dom 'data:text/html,<p>ok</p>'
 <html><head></head><body><p>ok</p></body></html>
-[exit 0, 0.3 s]
+[exit 0, 0.2 s]
 
-$ rm -rf .cache/cdp-browser/156.0.8078.80/mac-arm64/chrome-headless-shell-mac-arm64 .cache/cdp-browser/156.0.8078.80/mac-arm64/.sha256
+$ rm -rf .cache/cdp-browser/157.0.8103.38/mac-arm64/*/ .cache/cdp-browser/157.0.8103.38/mac-arm64/.sha256-pair
 [exit 0, 0.0 s]
 
-$ printf x >> .cache/cdp-browser/156.0.8078.80/mac-arm64/chrome-headless-shell-mac-arm64.zip
+$ printf x >> .cache/cdp-browser/157.0.8103.38/mac-arm64/chrome-headless-shell-mac-arm64.zip
 [exit 0, 0.0 s]
 
 $ vendor/bin/cdp-browser install
-The SHA-256 of ./.cache/cdp-browser/156.0.8078.80/mac-arm64/chrome-headless-shell-mac-arm64.zip is 6ae3a9d1c06ef42eeff96b9b5c4b272dce1207cc14544751e0d9712a8e7e1be7, the pin expects ea615baa2e9caf0d02d1898a6562b5f8fa9c35239707dae0f592178df5b986ac. The archive is deleted and nothing was unpacked.
+The SHA-256 of ./.cache/cdp-browser/157.0.8103.38/mac-arm64/chrome-headless-shell-mac-arm64.zip is 632fb77dd9fae23e8c3206f97fbf28ab45df51be9c0561facc6f5ee7ee9aa8b0, the pin expects e6a6b13551aa12f951d0891d79282606b13742837c8fa0505e1272bae116ce82. The archive is deleted and was not unpacked.
 [exit 65, 0.4 s]
 
-$ ls .cache/cdp-browser/156.0.8078.80/mac-arm64
+$ ls .cache/cdp-browser/157.0.8103.38/mac-arm64
+chromedriver-mac-arm64.zip
 [exit 0, 0.0 s]

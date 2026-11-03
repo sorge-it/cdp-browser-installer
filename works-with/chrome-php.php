@@ -7,6 +7,7 @@ declare(strict_types=1);
 // lines between the README markers stand word for word in the README; a test compares them.
 
 use HeadlessChromium\BrowserFactory;
+use SorgeIt\CdpBrowserInstaller\Binary;
 use SorgeIt\CdpBrowserInstaller\Installer;
 use SorgeIt\CdpBrowserInstaller\Pin;
 use SorgeIt\CdpBrowserInstaller\Platform;
@@ -15,7 +16,7 @@ require __DIR__.'/vendor/autoload.php';
 require __DIR__.'/check.php';
 
 // README: begin
-$binary = Installer::fromEnvironment(getenv())->browser(Pin::FILE, Platform::current());
+$binary = Installer::fromEnvironment(getenv())->binaries(Pin::FILE, Platform::current())->path(Binary::ChromeHeadlessShell);
 $browser = new BrowserFactory($binary)->createBrowser(['noSandbox' => PHP_OS_FAMILY === 'Linux']);
 // README: end
 

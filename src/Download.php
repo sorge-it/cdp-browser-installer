@@ -15,9 +15,9 @@ final readonly class Download
 
     public function __construct(private CommandLine $commandLine) {}
 
-    public static function url(string $version, Platform $platform): string
+    public static function url(string $version, Binary $binary, Platform $platform): string
     {
-        return self::SOURCE.$version.'/'.$platform->value.'/'.$platform->directory().'.zip';
+        return self::SOURCE.$version.'/'.$platform->value.'/'.$binary->directory($platform).'.zip';
     }
 
     /**
@@ -41,9 +41,9 @@ final readonly class Download
      *
      * @param  string|null  $headers  a file for the headers of the answer, which `pin` reads; `install` needs none
      */
-    public function to(string $version, Platform $platform, string $file, ?string $headers = null): void
+    public function to(string $version, Binary $binary, Platform $platform, string $file, ?string $headers = null): void
     {
-        $url = self::url($version, $platform);
+        $url = self::url($version, $binary, $platform);
         // A missing curl is a cause of the host, not of the download.
         $this->commandLine->find('curl');
 
@@ -56,7 +56,7 @@ final readonly class Download
                 '--proto', '=https', '--tlsv1.2',
                 // No `--location`: curl follows no redirect, and a 3xx is no 200.
                 '--connect-timeout', '30',
-                // An archive has about 100 MiB. Below 1 KiB/s for a minute, or above 500 MiB, the download stops.
+                // Below 1 KiB/s for a minute, or above 500 MiB, the download stops.
                 '--speed-limit', '1024', '--speed-time', '60',
                 '--max-filesize', '524288000',
                 '--output', $file,
@@ -89,7 +89,7 @@ final readonly class Download
     {
         // A failed removal does not replace the error of the download.
         if (is_file($file)) {
-            @unlink($file);
+            Files::quietly(static fn (): bool => unlink($file));
         }
     }
 }

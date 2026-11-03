@@ -80,7 +80,7 @@ jobs:
       - name: Install the system libraries
         run: sudo "$(command -v php)" vendor/bin/cdp-browser deps
 
-      - name: Install the browser of .chrome-version
+      - name: Install the pair of .chrome-version
         run: |
           cp ../.chrome-version .
           vendor/bin/cdp-browser install
@@ -89,8 +89,8 @@ jobs:
       - name: Start the summary
         run: |
           {
-            echo '| Tool | Version | Browser | Platform |'
-            echo '|---|---|---|---|'
+            echo '| Tool | Version | Browser | ChromeDriver | Platform |'
+            echo '|---|---|---|---|---|'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: chrome-php/chrome
@@ -98,3 +98,38 @@ jobs:
 
       - name: dmore/chrome-mink-driver
         run: php chrome-mink-driver.php
+
+      - name: php-webdriver/webdriver
+        run: php php-webdriver.php
+
+      - name: symfony/panther
+        run: php panther.php
+
+      # Dusk runs in a Laravel app, as in a project: the newest skeleton with the newest Dusk and
+      # this checkout, outside the checkout. No `dusk:install`: it downloads its own ChromeDriver.
+      - name: Create a Laravel app for laravel/dusk
+        run: |
+          app="$RUNNER_TEMP/laravel"
+          composer create-project --no-interaction --prefer-dist laravel/laravel "$app"
+          mkdir -p "$app/tests/Browser/console" "$app/tests/Browser/screenshots" "$app/tests/Browser/source"
+          cp .chrome-version "$app/"
+          cp dusk/DuskTestCase.php check.php "$app/tests/"
+          cp dusk/WorksWithTest.php "$app/tests/Browser/"
+          cp dusk/works-with.html "$app/public/"
+          cd "$app"
+          composer config repositories.installer path "$GITHUB_WORKSPACE"
+          composer require --dev --no-interaction laravel/dusk 'sorge-it/cdp-browser-installer:*@dev'
+          composer audit
+          composer outdated --strict laravel/dusk
+
+      - name: laravel/dusk
+        working-directory: ${{ runner.temp }}/laravel
+        env:
+          APP_URL: http://127.0.0.1:8000
+        run: |
+          php artisan serve --no-reload > /dev/null 2>&1 &
+          trap 'kill $!' EXIT
+          curl --silent --show-error --fail --retry 20 --retry-connrefused --retry-delay 1 --output /dev/null "$APP_URL/works-with.html"
+          php artisan dusk
+          # A run without a Dusk test also ends with exit code 0. check.php adds the row of the tool.
+          grep -q "^| \`laravel/dusk\` |" "$GITHUB_STEP_SUMMARY" || { echo '::error::No Dusk test ran: the summary has no row for laravel/dusk.'; exit 1; }

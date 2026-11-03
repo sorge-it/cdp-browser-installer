@@ -1,12 +1,12 @@
-# The animated demo in the README: `install` from the pin file, `path`, and an archive with one
-# byte added, which `install` refuses. `make -C demo install` wrote the pin file before.
+# The animated demo in the README: `install` from the pin file, the version of each binary of the
+# pair, and an archive with one byte added, which `install` refuses. `make -C demo install` wrote the pin file before.
 # Run through `make -C demo gif`; https://github.com/charmbracelet/vhs
 
 Output ../output/demo.gif
 
 Set Shell bash
 Set Width 1280
-Set Height 360
+Set Height 480
 Set FontSize 16
 Set Theme "Catppuccin Mocha"
 Set Padding 24
@@ -17,30 +17,29 @@ Set CursorBlink false
 Set WaitPattern /^\$\s*$/
 Set WaitTimeout 300s
 
+# The first frame shows the pin file: GitHub shows only that frame to a reader who reduces motion.
 Hide
 Type "export PS1='$ ' && rm -rf ~/.cache/cdp-browser && clear"
 Enter
 Wait
-Show
-
-Sleep 400ms
-Type "grep -e version -e linux-arm64 .chrome-version"
+Type "grep -e version -e chrome -e linux-arm64 .chrome-version"
 Enter
 Wait
+Show
 Sleep 2s
 
 Type "vendor/bin/cdp-browser install"
 Enter
-# The download of 121 MiB and the unpack take a minute or more: the GIF leaves the wait out.
+# The download and the unpack take a minute or more: the GIF leaves the wait out.
 Hide
 Wait
 Show
 Sleep 1s
-Type "vendor/bin/cdp-browser path"
+Type '"$(vendor/bin/cdp-browser path chrome-headless-shell)" --version'
 Enter
 Wait
 Sleep 1s
-Type '"$(vendor/bin/cdp-browser path)" --version'
+Type '"$(vendor/bin/cdp-browser path chromedriver)" --version'
 Enter
 Wait
 Sleep 2s
@@ -51,10 +50,10 @@ Wait
 Type "# The archive as a CI cache restores it, with one byte added"
 Enter
 Wait
-Type "dir=~/.cache/cdp-browser/156.0.8078.80/linux-arm64"
+Type "dir=~/.cache/cdp-browser/157.0.8103.38/linux-arm64"
 Enter
 Wait
-Type "rm -r $dir/chrome-headless-shell-linux-arm64 $dir/.sha256"
+Type "rm -r $dir/*/ $dir/.sha256-pair"
 Enter
 Wait
 Type "printf x >> $dir/chrome-headless-shell-linux-arm64.zip"

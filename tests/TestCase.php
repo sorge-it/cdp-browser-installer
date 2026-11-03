@@ -23,6 +23,9 @@ abstract class TestCase extends BaseTestCase
     /** The archive of chrome-headless-shell that the fake curl serves. */
     public string $archive;
 
+    /** The archive of chromedriver that the fake curl serves. */
+    public string $chromedriverArchive;
+
     public Pin $pin;
 
     public string $pinFile;
@@ -31,7 +34,7 @@ abstract class TestCase extends BaseTestCase
 
     public Installer $installer;
 
-    /** The directory of the browser for the version and the platform. */
+    /** The directory of the pair for the version and the platform. */
     public string $target;
 
     /**

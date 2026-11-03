@@ -7,7 +7,7 @@ namespace SorgeIt\CdpBrowserInstaller;
 use Closure;
 
 /**
- * The packages `install` and the browser need, from the signed sources of the system. Fixed lists,
+ * The packages `install` and the pair need, from the signed sources of the system. Fixed lists,
  * so that the command never installs a name it read from a download.
  *
  * @internal
@@ -23,7 +23,7 @@ final readonly class SystemLibraries
         'ca-certificates',
         'curl',
         'unzip',
-        // What chrome-headless-shell links against.
+        // What chrome-headless-shell links against; chromedriver needs no other library.
         'fonts-liberation',
         'libasound2t64',
         'libatk-bridge2.0-0t64',
@@ -49,10 +49,10 @@ final readonly class SystemLibraries
     ];
 
     /**
-     * Alpine: Chrome for Testing does not run on musl, so the browser comes from Alpine itself, as
-     * Puppeteer and Symfony Panther document it.
+     * Alpine: Chrome for Testing does not run on musl, so the pair comes from Alpine itself, as
+     * Puppeteer and Symfony Panther document it. Both packages come from one build of chromium.
      */
-    public const array APK = ['chromium', 'nss', 'freetype', 'harfbuzz', 'ttf-freefont'];
+    public const array APK = ['chromium', 'chromium-chromedriver', 'nss', 'freetype', 'harfbuzz', 'ttf-freefont'];
 
     /**
      * @param  CommandLine  $commandLine  finds apk or apt-get in its `PATH`
@@ -72,7 +72,7 @@ final readonly class SystemLibraries
         if ($commandLine->has('apk')) {
             $commandLine->run(['apk', 'add', '--no-cache', ...self::APK], $output);
 
-            return 'Set CDP_BROWSER_BINARY to the chromium of Alpine, such as /usr/bin/chromium; `install` then uses it.';
+            return sprintf('Set %s to %s and %s to %s; `install` then uses this pair.', Installer::OWN_CHROME, Binary::ChromeHeadlessShell->alpinePath(), Installer::OWN_CHROMEDRIVER, Binary::Chromedriver->alpinePath());
         }
 
         if ($commandLine->has('apt-get')) {
@@ -82,6 +82,6 @@ final readonly class SystemLibraries
             return '';
         }
 
-        throw new InstallerException('`deps` installs through apt or apk, and this system has neither. Install the libraries of `ldd chrome-headless-shell` yourself.');
+        throw new InstallerException('`deps` installs through apt or apk, and this system has neither. Install the libraries of `ldd chrome-headless-shell chromedriver` yourself.');
     }
 }
