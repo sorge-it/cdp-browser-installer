@@ -197,7 +197,7 @@ final class Environment
         $rest = '';
 
         // Under `open_basedir`, `realpath()` warns and gives `false` even for `/`.
-        while (($real = @realpath($path)) === false) {
+        while (($real = Files::quietly(static fn (): string|false => realpath($path))) === false) {
             if (dirname($path) === $path) {
                 return $rest;
             }

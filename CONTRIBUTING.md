@@ -20,9 +20,10 @@ the pull request.
 ## A feature
 
 Open a pull request with the change, or with a test of the behavior you want. The package installs
-one thing: a pinned `chrome-headless-shell` from Chrome for Testing, or the system's browser on
-musl. Features for Windows, for another browser or a driver such as ChromeDriver, or for another
-download source are out of scope and will be declined.
+one thing: the pinned pair of `chrome-headless-shell` and `chromedriver` from Chrome for Testing,
+or the system's pair on musl. Features for Windows, for another browser or another driver, to
+start or stop the browser or ChromeDriver, or for another download source are out of scope and
+will be declined.
 
 A new reason to stop comes with a test and with its class in the [Exceptions](README.md#exceptions)
 table of the README, usually `InstallerException`.
@@ -40,14 +41,14 @@ makes the tests of `flock()` and of unreadable files fail without any mutant, so
 that counts as caught may have escaped: check it by hand.
 
 The code must run on PHP 8.4, on Linux with glibc and musl, and on macOS. When a message or a step
-of the demo changes, record the demo again. Both commands need network access: `pin` downloads the
-four archives of 156.0.8078.80, 445 MiB in total.
+of the demo changes, record the demo again. Both commands need network access: `pin` downloads
+the archive of each binary for each platform of version 157.0.8103.38.
 
 - `make -C demo record` writes the text demo on your machine and needs PHP 8.4, Composer, curl and
   unzip.
 - `make -C demo all` records the GIF and the social preview in Docker. The preflight, the GIF and
-  the social preview each download the linux-arm64 archive, 126,679,292 bytes or 121 MiB. A run
-  without a pin file in `demo/app`, as after `make clean`, also pins: 808 MiB in total. The
+  the social preview each download the linux-arm64 archives of the pair. A run without a pin file
+  in `demo/app`, as after `make clean`, also pins. The
   container runs linux-arm64 on every host: an x64 host needs arm64 emulation through QEMU and
   binfmt, which Docker Desktop includes.
 
@@ -59,12 +60,12 @@ the notice of a scheduled run to the user who created the workflow or last chang
 line. Do not make either job a required check: a new Stable would block pull requests.
 
 - **Red in `Chrome for Testing · SHA-256`:** the job runs `pin` for the version of
-  `.chrome-version` again, into a pin file of its own: four downloads, 445 MiB. It fails when
-  `pin` fails or a SHA-256 differs from `.chrome-version`; the log names the platform and both
-  values. After a network error or a 5xx status, run it again. A SHA-256 that differs does not go
-  away when you run the job again: the archive of a published version should not change. Do not
-  pin the new bytes to make the check green. Find out why, and report it privately if it could be
-  an attack (see [SECURITY.md](SECURITY.md)).
+  `.chrome-version` again, into a pin file of its own: one download for each binary and each
+  platform. It fails when `pin` fails or a SHA-256 differs from `.chrome-version`; the log names
+  the binary, the platform and both values. After a network error or a 5xx status, run it again.
+  A SHA-256 that differs does not go away when you run the job again: the archive of a published
+  version should not change. Do not pin the new bytes to make the check green. Find out why, and
+  report it privately if it could be an attack (see [SECURITY.md](SECURITY.md)).
 - **Red in `Chrome for Testing · Stable`:** the current Stable in
   `last-known-good-versions.json` is newer than `.chrome-version`; the log names both versions.
   The job also fails when it cannot read the list or the list names no valid Stable; then run it
@@ -73,7 +74,7 @@ line. Do not make either job a required check: a new Stable would block pull req
 To update the pin file to a new Stable:
 
 1. Run `php bin/cdp-browser pin <new version>`.
-2. Review the version and the four SHA-256 in the diff of `.chrome-version`.
+2. Review the version and each SHA-256 in the diff of `.chrome-version`.
 3. Change the other files that name the old version: the README, this file and `demo/`. Find
    them with `grep -rn <old version> README.md CONTRIBUTING.md demo`. The tests and `src/` use a
    version only as a sample and keep it.

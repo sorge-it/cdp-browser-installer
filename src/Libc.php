@@ -14,9 +14,9 @@ namespace SorgeIt\CdpBrowserInstaller;
 final class Libc
 {
     /**
-     * The message of `install` and `path` on musl, with the two steps to the system's browser.
+     * The message of `install` and `path` on musl, with the two steps to the system's pair.
      */
-    public const string REFUSAL = "Chrome for Testing is built against glibc and does not start on musl, as on Alpine. Install the system's browser (`cdp-browser deps` runs `apk add chromium`), then set ".Installer::OWN_BROWSER.' to its path, such as /usr/bin/chromium.';
+    public const string REFUSAL = "Chrome for Testing is built against glibc and does not start on musl, as on Alpine. Install the system's pair (`cdp-browser deps` runs `apk add chromium chromium-chromedriver`), then set ".Installer::OWN_CHROME.' to the browser, such as /usr/bin/chromium, and '.Installer::OWN_CHROMEDRIVER.' to the chromedriver, such as /usr/bin/chromedriver.';
 
     /**
      * @param  string|null  $getconf  the output of `getconf GNU_LIBC_VERSION`, `null` where it failed
@@ -54,6 +54,6 @@ final class Libc
             $getconf = null;
         }
 
-        return self::isMusl($getconf, is_readable($maps) ? (string) @file_get_contents($maps) : '', glob($loaders) ?: []);
+        return self::isMusl($getconf, is_readable($maps) ? (string) Files::quietly(static fn (): string|false => file_get_contents($maps)) : '', glob($loaders) ?: []);
     }
 }

@@ -1,83 +1,316 @@
 # cdp-browser-installer
 
-**Pinned headless Chrome™ for PHP browser tests, installed by Composer. No Node, no npm.**
+**Headless Chrome™ and ChromeDriver of one pinned version for PHP browser tests, installed by Composer. No Node, no npm.**
 
-[![Tests](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/tests.yml/badge.svg)](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/tests.yml)
-[![Chrome for Testing](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/chrome-for-testing.yml/badge.svg)](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/chrome-for-testing.yml)
-[![Works with](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/works-with.yml/badge.svg)](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/works-with.yml)
+[![Tests](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/tests.yml)
+[![Chrome for Testing](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/chrome-for-testing.yml/badge.svg?branch=main)](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/chrome-for-testing.yml)
+[![Works with](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/works-with.yml/badge.svg?branch=main)](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/works-with.yml)
 [![Latest Version](https://img.shields.io/packagist/v/sorge-it/cdp-browser-installer)](https://packagist.org/packages/sorge-it/cdp-browser-installer)
 [![Total Downloads](https://img.shields.io/packagist/dt/sorge-it/cdp-browser-installer)](https://packagist.org/packages/sorge-it/cdp-browser-installer)
 [![License](https://img.shields.io/packagist/l/sorge-it/cdp-browser-installer)](https://github.com/sorge-it/cdp-browser-installer/blob/main/LICENSE)
 [![PHP Version](https://img.shields.io/packagist/dependency-v/sorge-it/cdp-browser-installer/php)](https://github.com/sorge-it/cdp-browser-installer/blob/main/composer.json)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](https://github.com/sorge-it/cdp-browser-installer/blob/main/phpstan.neon)
 
-`sorge-it/cdp-browser-installer` installs `chrome-headless-shell` from
-[Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/) as a Composer dev
-dependency, on Linux and macOS, on x64 and arm64. A pin file next to `composer.lock` names the
-version and the SHA-256 of each archive. `install` checks the SHA-256 before each unpack, also for
-an archive that a CI cache restored. Every developer and every CI run gets the same headless
-browser. It is the PHP counterpart of `npx @puppeteer/browsers install`.
+`sorge-it/cdp-browser-installer` installs `chrome-headless-shell` and `chromedriver` of one
+version from [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/) as a
+Composer dev dependency, on Linux and macOS, on x64 and arm64. A pin file next to `composer.lock`
+names the version and the SHA-256 of each archive. `install` checks the SHA-256 before each
+unpack, also for an archive that a CI cache restored. Every developer and every CI run gets the
+same headless browser and the same ChromeDriver. ChromeDriver and the browser come from one pin,
+so ChromeDriver does not stop with
+`session not created: This version of ChromeDriver only supports Chrome version …`. It is the PHP
+counterpart of `npx @puppeteer/browsers install`.
 
-**Built for coding agents and CI.** An agent writes the browser test, and CI installs the browser
-on each run. No human looks at each download. You review the pin file once, in the pull request,
+**Built for coding agents and CI.** An agent writes the browser test, and CI installs the pair on
+each run. No human looks at each download. You review the pin file once, in the pull request,
 like a change to `composer.lock`. After that, each install checks the archive against it. A
 command that refuses ends with a non-zero exit code and a message that names the cause and the
 next step: 75 for a download that a retry can fix, 65 for a wrong SHA-256, 1 for every other cause.
 The laptop and CI read the same pin file, so a test does not fail in CI only because the browser
-differs.
+or ChromeDriver differs.
 
 ## Quick start
 
 ```sh
 composer require --dev sorge-it/cdp-browser-installer
-vendor/bin/cdp-browser pin 156.0.8078.80   # writes the pin file .chrome-version; commit it
-vendor/bin/cdp-browser install             # in each checkout, container and CI run
-vendor/bin/cdp-browser path                # prints the path of the browser
+vendor/bin/cdp-browser pin 157.0.8103.38               # writes the pin file .chrome-version; commit it
+vendor/bin/cdp-browser install                         # in each checkout, container and CI run
+vendor/bin/cdp-browser path chrome-headless-shell      # prints the path of the browser
+vendor/bin/cdp-browser path chromedriver               # prints the path of ChromeDriver
 ```
 
 Take the version from the
 [Chrome for Testing dashboard](https://googlechromelabs.github.io/chrome-for-testing/). `pin`
-downloads the archive for each platform and writes the version and each SHA-256. If the system
-lacks `curl`, `unzip` or a library of the browser, run `vendor/bin/cdp-browser deps` as root
-first. In the
+downloads the archives of both binaries for each platform and writes the version and each
+SHA-256. If the system lacks `curl`, `unzip` or a library of the pair, run
+`vendor/bin/cdp-browser deps` as root first. In the
 [text demo](https://github.com/sorge-it/cdp-browser-installer/blob/main/demo/output/demo.txt) on
-macOS arm64, the first `install` took 9.4 s with the download, the second 0.0 s.
+macOS arm64, the first `install` took 13.2 s with the download of the pair, the second 0.0 s.
+To upgrade from release 1.x, do each step in the
+[CHANGELOG](https://github.com/sorge-it/cdp-browser-installer/blob/main/CHANGELOG.md#upgrade-from-1x).
 
-A test tool that drives Chrome through the Chrome DevTools Protocol (CDP) starts the binary that
-`path` prints, or calls the [PHP API](#use-from-php). [Works with](#works-with) names the tools
-that a CI job proves with this browser. The package contains no Pest or PHPUnit plugin, and it
-installs no ChromeDriver. A project with Node can use
-`npx @puppeteer/browsers install` or `npx playwright install` instead.
+A WebDriver tool, such as [`laravel/dusk`](#laraveldusk),
+[`symfony/panther`](#symfonypanther) or [`php-webdriver/webdriver`](#php-webdriverwebdriver),
+starts the ChromeDriver that `path chromedriver` prints and gives it the browser that
+`path chrome-headless-shell` prints. A tool that drives Chrome through the Chrome DevTools Protocol
+(CDP), such as [`chrome-php/chrome`](#chrome-phpchrome) or
+[`dmore/chrome-mink-driver`](#dmorechrome-mink-driver), starts the browser or connects to it. Each
+tool can also get both paths from the [PHP API](#use-from-php). A CI job runs these five tools
+with the pair of the pin file (see [Works with](#works-with)). The package contains no Pest or
+PHPUnit plugin, and it starts neither the browser nor ChromeDriver for a test. A project with Node can use `npx @puppeteer/browsers install` or `npx playwright install`
+instead.
 
 **Platforms.** Linux with glibc and macOS, on x64 and arm64. On Windows, Composer refuses the
-package. On Alpine and other musl systems, use the system's `chromium`; its version is Alpine's,
-not the pin file's (see [Alpine](#alpine-and-other-musl-systems)). `install` and `pin` refuse
-to run as root without `--allow-root` (see [Commands](#commands)).
+package. On Alpine and other musl systems, use the system's `chromium` and `chromedriver`; their
+version is Alpine's, not the pin file's (see [Alpine](#alpine-and-other-musl-systems)). `install`
+and `pin` refuse to run as root without `--allow-root` (see [Commands](#commands)).
 
 **Trust.** [Security](#security) lists seven rules and the code that implements each.
 [Limits of the security model](#limits-of-the-security-model) lists what the installer does not
 check. `composer test` requires PHPStan level max and 100 % type coverage; a CI job requires
 100 % line coverage. Each week, the workflow `chrome-for-testing` checks each pinned SHA-256
-against Chrome for Testing (see [The pin file](#the-pin-file)). The CI job `works-with` runs each
-tool under [Works with](#works-with).
+against Chrome for Testing (see [The pin file](#the-pin-file)).
 
-![install checks the pinned archive and installs the browser, then refuses an archive with one byte added](https://github.com/sorge-it/cdp-browser-installer/raw/main/demo/output/demo.gif)
+![cdp-browser install checks the SHA-256 of the chrome-headless-shell and chromedriver archives, installs both, then refuses an archive with one byte added](https://github.com/sorge-it/cdp-browser-installer/raw/main/demo/output/demo.gif)
 
-`install` reads the version and the SHA-256 from the pin file, downloads the archive and checks it
-before unpacking. The GIF skips the wait for the download. The stamp is a file beside the browser
-with the SHA-256 of its archive. The demo removes the browser and its stamp, as if a CI cache had
-restored only the archive. It adds one byte to the archive, and `install` deletes the archive
-without unpacking it. The GIF demo runs in Docker on Debian 13, on linux-arm64.
+`install` reads the version and the SHA-256 of each archive from the pin file, downloads both
+archives and checks each before unpacking. The GIF skips the wait for the download. The stamp is a
+file beside the pair with the SHA-256 of each archive. The demo removes the pair and its stamp, as
+if a CI cache had restored only the archives. It adds one byte to the archive of the browser, and
+`install` deletes that archive without unpacking anything. The GIF demo runs in Docker on
+Debian 13, on linux-arm64.
 
-## Run the browser
+## Works with
 
-`vendor/bin/cdp-browser path` prints the path of the browser. Start it from that path, not
-through a symbolic link: on macOS, Chrome looks for its data files next to the path it was started
-from.
+Each tool below runs with the pair of the pin file, and a CI job proves it on each run (see
+[The CI job `works-with`](#the-ci-job-works-with)). Run `vendor/bin/cdp-browser install` before
+the examples.
+
+- WebDriver: [`laravel/dusk`](#laraveldusk), [`symfony/panther`](#symfonypanther) and
+  [`php-webdriver/webdriver`](#php-webdriverwebdriver). The tool starts ChromeDriver from
+  `$binaries->path(Binary::Chromedriver)` and gives it the browser from
+  `$binaries->path(Binary::ChromeHeadlessShell)`. ChromeDriver starts the browser.
+- CDP: [`chrome-php/chrome`](#chrome-phpchrome) and
+  [`dmore/chrome-mink-driver`](#dmorechrome-mink-driver). The tool starts the browser from
+  `$binaries->path(Binary::ChromeHeadlessShell)` or connects to it.
+
+A WebDriver tool needs no ChromeDriver of its own, such as the one that
+`php artisan dusk:chrome-driver` or `vendor/bin/bdi detect drivers` installs. Each example turns
+off the sandbox on Linux in its code, or names `--no-sandbox` in its text, as the job does: on
+Ubuntu 23.10 and later, AppArmor blocks the user namespaces of the sandbox (see
+[Run the browser and ChromeDriver](#run-the-browser-and-chromedriver)). `chrome-headless-shell`
+has no window, so `DUSK_HEADLESS_DISABLED` and `PANTHER_NO_HEADLESS` do not open one. For a
+window, use a Chrome of the system and a ChromeDriver of its version.
+
+### laravel/dusk
+
+[`laravel/dusk`](https://packagist.org/packages/laravel/dusk) starts ChromeDriver in `prepare()`
+of `tests/DuskTestCase.php` and connects to it in `driver()`. Write `tests/DuskTestCase.php` with
+the class below, and put each test in `tests/Browser/`. Dusk writes to `tests/Browser/console`,
+`tests/Browser/screenshots` and `tests/Browser/source`, so create these directories. Do not run
+`php artisan dusk:install`: it writes the same file, but it also installs a ChromeDriver of its
+own. After an earlier `dusk:install`, replace `prepare()` and `driver()` and add `binaries()`.
+
+`visit()` loads a path below `APP_URL`, so a server must serve the app. Set `APP_URL` to the
+address of `php artisan serve`, such as `http://127.0.0.1:8000`, as the job does. Dusk stops the
+browser and ChromeDriver after the tests of each class. Dusk needs `ext-zip`.
+
+```php
+namespace Tests;
+
+use Facebook\WebDriver\Chrome\ChromeOptions;
+use Facebook\WebDriver\Remote\DesiredCapabilities;
+use Facebook\WebDriver\Remote\RemoteWebDriver;
+use Laravel\Dusk\TestCase as BaseTestCase;
+use PHPUnit\Framework\Attributes\BeforeClass;
+use SorgeIt\CdpBrowserInstaller\Binaries;
+use SorgeIt\CdpBrowserInstaller\Binary;
+use SorgeIt\CdpBrowserInstaller\Installer;
+use SorgeIt\CdpBrowserInstaller\Pin;
+use SorgeIt\CdpBrowserInstaller\Platform;
+
+abstract class DuskTestCase extends BaseTestCase
+{
+    #[BeforeClass]
+    final public static function prepare(): void
+    {
+        static::useChromedriver(self::binaries()->path(Binary::Chromedriver));
+        static::startChromeDriver(['--port=9515']);
+    }
+
+    protected function driver(): RemoteWebDriver
+    {
+        $options = new ChromeOptions()->setBinary(self::binaries()->path(Binary::ChromeHeadlessShell));
+        $options->addArguments(PHP_OS_FAMILY === 'Linux' ? ['--no-sandbox'] : []);
+
+        return RemoteWebDriver::create('http://localhost:9515', DesiredCapabilities::chrome()->setCapability(ChromeOptions::CAPABILITY, $options));
+    }
+
+    private static function binaries(): Binaries
+    {
+        return Installer::fromEnvironment(getenv())->binaries(Pin::FILE, Platform::current());
+    }
+}
+```
+
+### symfony/panther
+
+[`symfony/panther`](https://packagist.org/packages/symfony/panther) starts ChromeDriver from the
+path that you pass to `Client::createChromeClient()`. It reads the path of the browser from
+`$_SERVER['PANTHER_CHROME_BINARY']` and the sandbox setting from `$_SERVER['PANTHER_NO_SANDBOX']`.
+Set both before `Client::createChromeClient()`: Panther reads them when it creates the client.
+`PantherTestCase::createPantherClient()` passes no path of ChromeDriver; it looks for
+`chromedriver` in `PATH`, `./drivers` and `./vendor/bin`. For the pinned ChromeDriver, create the
+client as below. Panther passes `--port` to ChromeDriver itself. Panther needs `ext-dom` and
+`ext-libxml`, and through `php-webdriver/webdriver` also `ext-curl` and `ext-zip`.
+
+```php
+use SorgeIt\CdpBrowserInstaller\Binary;
+use SorgeIt\CdpBrowserInstaller\Installer;
+use SorgeIt\CdpBrowserInstaller\Pin;
+use SorgeIt\CdpBrowserInstaller\Platform;
+use Symfony\Component\Panther\Client;
+
+$binaries = Installer::fromEnvironment(getenv())->binaries(Pin::FILE, Platform::current());
+$_SERVER['PANTHER_CHROME_BINARY'] = $binaries->path(Binary::ChromeHeadlessShell);
+$_SERVER['PANTHER_NO_SANDBOX'] = PHP_OS_FAMILY === 'Linux' ? '1' : '0';
+$client = Client::createChromeClient($binaries->path(Binary::Chromedriver));
+
+try {
+    // Drive the page.
+} finally {
+    $client->quit();
+}
+```
+
+### php-webdriver/webdriver
+
+[`php-webdriver/webdriver`](https://packagist.org/packages/php-webdriver/webdriver) starts
+ChromeDriver from the path of the pair, and ChromeDriver starts the browser from the path in
+`ChromeOptions`. Give `ChromeDriverService` the port twice: as its second argument, and as
+`--port` in its arguments. The service passes only the arguments to ChromeDriver, and without
+`--port`, ChromeDriver 157 listens on a random port. `quit()` stops the browser and ChromeDriver.
+It needs `ext-curl` and `ext-zip`.
+
+```php
+use Facebook\WebDriver\Chrome\ChromeDriver;
+use Facebook\WebDriver\Chrome\ChromeDriverService;
+use Facebook\WebDriver\Chrome\ChromeOptions;
+use Facebook\WebDriver\Remote\DesiredCapabilities;
+use SorgeIt\CdpBrowserInstaller\Binary;
+use SorgeIt\CdpBrowserInstaller\Installer;
+use SorgeIt\CdpBrowserInstaller\Pin;
+use SorgeIt\CdpBrowserInstaller\Platform;
+
+$binaries = Installer::fromEnvironment(getenv())->binaries(Pin::FILE, Platform::current());
+$options = new ChromeOptions()->setBinary($binaries->path(Binary::ChromeHeadlessShell));
+$options->addArguments(PHP_OS_FAMILY === 'Linux' ? ['--no-sandbox'] : []);
+$capabilities = DesiredCapabilities::chrome()->setCapability(ChromeOptions::CAPABILITY, $options);
+$service = new ChromeDriverService($binaries->path(Binary::Chromedriver), 9515, ['--port=9515']);
+$driver = ChromeDriver::start($capabilities, $service);
+
+try {
+    // Drive the page.
+} finally {
+    $driver->quit();
+}
+```
+
+### chrome-php/chrome
+
+[`chrome-php/chrome`](https://packagist.org/packages/chrome-php/chrome) starts the browser from
+the path of `Binary::ChromeHeadlessShell` in the pair that `binaries()` returns. It needs
+`ext-sockets`.
+
+```php
+use HeadlessChromium\BrowserFactory;
+use SorgeIt\CdpBrowserInstaller\Binary;
+use SorgeIt\CdpBrowserInstaller\Installer;
+use SorgeIt\CdpBrowserInstaller\Pin;
+use SorgeIt\CdpBrowserInstaller\Platform;
+
+$binary = Installer::fromEnvironment(getenv())->binaries(Pin::FILE, Platform::current())->path(Binary::ChromeHeadlessShell);
+$browser = new BrowserFactory($binary)->createBrowser(['noSandbox' => PHP_OS_FAMILY === 'Linux']);
+
+try {
+    $page = $browser->createPage();
+    // Drive the page.
+} finally {
+    $browser->close();
+}
+```
+
+### dmore/chrome-mink-driver
+
+[`dmore/chrome-mink-driver`](https://packagist.org/packages/dmore/chrome-mink-driver) connects to
+a browser that already runs; `dmore/behat-chrome-extension` uses this driver. The driver needs
+`ext-curl` and `ext-mbstring`. Start the browser with a debugging port and a profile directory.
+On Linux, add `--no-sandbox`. The browser writes the port to `DevToolsActivePort` in the profile
+once it listens; wait for that file before the driver connects. Remove `.chrome-profile` before
+each run: an old `DevToolsActivePort` in it names the port of an earlier browser. Stop the browser
+after the tests.
 
 ```sh
-"$(vendor/bin/cdp-browser path)" --dump-dom 'data:text/html,<p>ok</p>'
+"$(vendor/bin/cdp-browser path chrome-headless-shell)" --headless --remote-debugging-port=9222 --user-data-dir="$PWD/.chrome-profile" &
 ```
+
+```php
+use Behat\Mink\Session;
+use DMore\ChromeDriver\ChromeDriver;
+
+$session = new Session(new ChromeDriver('http://127.0.0.1:9222', null, 'http://localhost'));
+$session->start();
+
+try {
+    // Drive the page.
+} finally {
+    $session->stop();
+}
+```
+
+### The CI job `works-with`
+
+The CI job [`works-with`](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/works-with.yml)
+runs each tool in this section with the pair of the pin file of this repository. For each tool, it
+installs the newest release, loads a page through the tool and reads the text of one element. The
+page is a `data:` page. For Laravel Dusk, `php artisan serve` serves the page as
+`public/works-with.html` in a new Laravel app. The job also checks that the browser reports the
+version of the pin file, and for a WebDriver tool, that ChromeDriver does too. It runs with PHP 8.5
+on Linux x64, Linux arm64 and macOS arm64, not on macOS x64. It runs each Monday, on demand, after
+each merge, and on each pull request that changes the pin file, the installer or the job.
+
+Its badge at the top of this file shows the last result on `main`. Green means that each tool read
+the page on each of the three platforms. Each run lists in its summary the version of each tool,
+the browser, ChromeDriver and the platform. Red means that a step failed, and the name of the step
+tells which: each tool has a step with its name. The other steps fail when a tool is not at its
+newest release, when `composer audit` finds an advisory, when `deps` or `install` stops, or when
+the Laravel app for Dusk cannot be created. When a new release of a tool fails, require the version
+of the last green run in your project. A tool that the job does not run is not in this section.
+
+The code of the job is in
+[`works-with/`](https://github.com/sorge-it/cdp-browser-installer/tree/main/works-with). A test
+of `composer test` keeps three parts of each example equal to the scripts of the job: the PHP
+lines that set up the tool, the `finally` block that stops the tool, and the shell command of
+`dmore/chrome-mink-driver`. For Laravel Dusk, the methods of `DuskTestCase` are the PHP lines, and
+Dusk has no `finally` block.
+
+## Run the browser and ChromeDriver
+
+`vendor/bin/cdp-browser path chrome-headless-shell` prints the path of the browser, and
+`vendor/bin/cdp-browser path chromedriver` the path of ChromeDriver. Start each from that path, not
+through a symbolic link: on macOS, Chrome looks for its data files next to the path it was started
+from. Both report the version of the pin file:
+
+```sh
+"$(vendor/bin/cdp-browser path chrome-headless-shell)" --version   # Google Chrome for Testing 157.0.8103.38
+"$(vendor/bin/cdp-browser path chromedriver)" --version            # ChromeDriver 157.0.8103.38 (…)
+"$(vendor/bin/cdp-browser path chrome-headless-shell)" --dump-dom 'data:text/html,<p>ok</p>'
+```
+
+A WebDriver tool that connects to a running ChromeDriver needs it started with a port, such as
+`"$(vendor/bin/cdp-browser path chromedriver)" --port=9515`. The tool gives ChromeDriver the path
+of `path chrome-headless-shell` as `binary` in `goog:chromeOptions`; without it, ChromeDriver looks
+for a Chrome of the system.
 
 On Ubuntu 23.10 and later, and in most containers, Chrome's sandbox finds no user namespace
 and Chrome stops with `No usable sandbox!`. Start it with `--no-sandbox` there; the installer does
@@ -87,15 +320,30 @@ not decide that for you.
 
 ```json
 {
-    "version": "156.0.8078.80",
-    "sha256": {
-        "linux64": "547dcd374e02961bf998f6046a267644f8502225c36bb78ca307dab32a0b3eb4",
-        "linux-arm64": "5bb6a00a4285c13303d3f72c5afdb70f144ea7a93eed462365a52b69631c9607",
-        "mac-x64": "535d417d9034cbd11e7dacd1a71aa3d6e1b525e6d5dcd2671eb2532f01481228",
-        "mac-arm64": "ea615baa2e9caf0d02d1898a6562b5f8fa9c35239707dae0f592178df5b986ac"
+    "version": "157.0.8103.38",
+    "chrome-headless-shell": {
+        "linux64": "deafffa74660b34853a4119c361fd427ac8c9fcb62db51ddb8a797cd83a4ba2d",
+        "linux-arm64": "b9b910a57b2a15eb3e55000a2339f93a973934a413ebfc6e585a50ec6c42fd6c",
+        "mac-x64": "79821745d0a72d2ba752d981284ed0a9e6fa320dad133596941a17dba6186de3",
+        "mac-arm64": "e6a6b13551aa12f951d0891d79282606b13742837c8fa0505e1272bae116ce82"
+    },
+    "chromedriver": {
+        "linux64": "329525fa0bf02be19794de1e9475772ef64695e0456f142888bd70df3147dc1e",
+        "linux-arm64": "8166fad77893cb095a45678f29ebec7ea14a8ac89364d28d52176a6fd4b30262",
+        "mac-x64": "7725504324ce8e8e03f78392ecf288890e082d215f619edd87a2dc1235e780a4",
+        "mac-arm64": "e59394fda6a05067362c225678e185e46e473cebea1593025deb2b2641b75688"
     }
 }
 ```
+
+The pin file names one version and the SHA-256 of the archive of each binary for each platform.
+A pin file of release 1.x has the key `sha256` instead and pins only the browser. For the pinned
+pair, `install` and `path` refuse it with exit code 1, and `Pin::read()` and
+`Installer::binaries()` throw an `InstallerException`. The message names
+`cdp-browser pin <version>`, which writes a new pin file. On musl, `install`, `path` and
+`Installer::binaries()` refuse the pinned pair before they read the pin file. With both
+`CDP_BROWSER_CHROME` and `CDP_BROWSER_CHROMEDRIVER` set, `install` and `path` do not read the pin
+file.
 
 Chrome for Testing publishes no SHA-256 and no signature: its JSON endpoints list only a platform
 and a URL for each download. So `pin` computes the SHA-256 from its own download, after it has
@@ -143,26 +391,31 @@ To pin the action to a commit SHA, as this repository's workflow does:
 ## Use from PHP
 
 ```php
+use SorgeIt\CdpBrowserInstaller\Binaries;
+use SorgeIt\CdpBrowserInstaller\Binary;
 use SorgeIt\CdpBrowserInstaller\DownloadException;
 use SorgeIt\CdpBrowserInstaller\Installer;
 use SorgeIt\CdpBrowserInstaller\Pin;
 use SorgeIt\CdpBrowserInstaller\Platform;
 
-// The environment decides: CDP_BROWSER_BINARY, CDP_BROWSER_PATH, XDG_CACHE_HOME, HOME,
-// CDP_BROWSER_TIMEOUT, CDP_BROWSER_LOCK_TIMEOUT.
-$browser = static fn (): string => Installer::fromEnvironment(getenv())->browser(Pin::FILE, Platform::current());
+// The environment decides: CDP_BROWSER_CHROME, CDP_BROWSER_CHROMEDRIVER, CDP_BROWSER_PATH,
+// XDG_CACHE_HOME, HOME, CDP_BROWSER_TIMEOUT, CDP_BROWSER_LOCK_TIMEOUT.
+$pair = static fn (): Binaries => Installer::fromEnvironment(getenv())->binaries(Pin::FILE, Platform::current());
 
 try {
-    $binary = $browser();
+    $binaries = $pair();
 } catch (DownloadException) {
     // A retry can help, as after a network error or a 5xx status.
-    $binary = $browser();
+    $binaries = $pair();
 }
+
+$browser = $binaries->path(Binary::ChromeHeadlessShell);
+$chromedriver = $binaries->path(Binary::Chromedriver);
 ```
 
-`browser()` checks and returns the system's browser, or returns the path of the pinned one and
-installs it first if it is missing. A `ChecksumException` and every other `InstallerException`
-reach the caller (see [Exceptions](#exceptions)).
+`binaries()` checks and returns the system's pair, or returns the paths of the pinned pair and
+installs it first if a binary is missing. A `ChecksumException` and every other
+`InstallerException` reach the caller (see [Exceptions](#exceptions)).
 
 Without the environment, pass each value to the constructors:
 
@@ -170,85 +423,12 @@ Without the environment, pass each value to the constructors:
 use SorgeIt\CdpBrowserInstaller\CommandLine;
 
 $installer = new Installer(new CommandLine(timeout: 300), '/srv/cache/cdp-browser', lockTimeout: 60);
-$binary = $installer->install(Pin::read('.chrome-version'), Platform::current());
+$binaries = $installer->install(Pin::read('.chrome-version'), Platform::current());
 ```
 
 [API](#api) lists the classes and members that SemVer covers.
 
-## Works with
-
-The CI job [`works-with`](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/works-with.yml)
-runs each tool in this section with the browser of the pin file of this repository. For each
-tool, it installs the newest release, loads a `data:` page through the tool and reads the text of
-one element. It also checks that the browser reports the version of the pin file. It runs with
-PHP 8.5 on Linux x64, Linux arm64 and macOS arm64, not on macOS x64. It runs each Monday, on
-demand, after each merge, and on each pull request that changes the pin file, the installer or the
-job.
-
-Its badge at the top of this file shows the last result on `main`. Green means that each tool read
-the page on each of the three platforms. Each run lists in its summary the version of each tool,
-the browser and the platform. Red means that a step failed, and the name of the step tells which:
-each tool has a step with its name. The steps before them fail when a tool is not at its newest
-release, when `composer audit` finds an advisory, or when `deps` or `install` stops. When a new
-release of a tool fails, require the version of the last green run in your project. A tool that
-the job does not run is not in this section. The code of the job is in
-[`works-with/`](https://github.com/sorge-it/cdp-browser-installer/tree/main/works-with). A test
-of `composer test` keeps three parts of the examples below equal to the scripts of the job: the
-PHP lines that set up the tool, the `finally` block that stops the browser, and the command line.
-
-### chrome-php/chrome
-
-[`chrome-php/chrome`](https://packagist.org/packages/chrome-php/chrome) starts the browser from
-the path that `browser()` returns. It needs `ext-sockets`. The example turns off the sandbox on
-Linux, as the job does: on Ubuntu 24.04, AppArmor blocks the user namespaces of the sandbox (see
-[Run the browser](#run-the-browser)).
-
-```php
-use HeadlessChromium\BrowserFactory;
-use SorgeIt\CdpBrowserInstaller\Installer;
-use SorgeIt\CdpBrowserInstaller\Pin;
-use SorgeIt\CdpBrowserInstaller\Platform;
-
-$binary = Installer::fromEnvironment(getenv())->browser(Pin::FILE, Platform::current());
-$browser = new BrowserFactory($binary)->createBrowser(['noSandbox' => PHP_OS_FAMILY === 'Linux']);
-
-try {
-    $page = $browser->createPage();
-    // Drive the page.
-} finally {
-    $browser->close();
-}
-```
-
-### dmore/chrome-mink-driver
-
-[`dmore/chrome-mink-driver`](https://packagist.org/packages/dmore/chrome-mink-driver) connects to
-a browser that already runs; `dmore/behat-chrome-extension` uses this driver. The driver needs
-`ext-curl` and `ext-mbstring`. Start the browser with a debugging port and a profile directory.
-On Linux, add `--no-sandbox`, as the job does: on Ubuntu 24.04, AppArmor blocks the user
-namespaces of the sandbox (see [Run the browser](#run-the-browser)). The browser writes the port to
-`DevToolsActivePort` in the profile once it listens; wait for that file before the driver
-connects. Stop the browser after the tests.
-
-```sh
-"$(vendor/bin/cdp-browser path)" --headless --remote-debugging-port=9222 --user-data-dir="$PWD/.chrome-profile" &
-```
-
-```php
-use Behat\Mink\Session;
-use DMore\ChromeDriver\ChromeDriver;
-
-$session = new Session(new ChromeDriver('http://127.0.0.1:9222', null, 'http://localhost'));
-$session->start();
-
-try {
-    // Drive the page.
-} finally {
-    $session->stop();
-}
-```
-
-## Comparison with Puppeteer, Playwright, Laravel Dusk and Symfony Panther
+## Comparison with Puppeteer, Playwright, Laravel Dusk, Symfony Panther and bdi
 
 Chrome for Testing's README names
 [`@puppeteer/browsers`](https://github.com/GoogleChromeLabs/chrome-for-testing/blob/f0abac9d5b65cc206b06d1707ecda7a57f094069/README.md#L152-L154)
@@ -258,7 +438,7 @@ Playwright or Puppeteer from npm. As of 2026-11-02, from the source code of each
 
 | Package | Version | Made for | Installs | Node | Pins a version | Checks a SHA-256 | Locks a parallel install | Windows |
 |---|---|---|---|---|---|---|---|---|
-| [**`sorge-it/cdp-browser-installer`**](https://github.com/sorge-it/cdp-browser-installer) | this README | installing a pinned, SHA-256-checked `chrome-headless-shell` as a Composer dev dependency | `chrome-headless-shell` from Chrome for Testing, for Linux and macOS on x64 and arm64 | no | yes, in the pin file | yes, before each unpack | yes, for each version and platform | no: Composer refuses it, as it requires `ext-posix` |
+| [**`sorge-it/cdp-browser-installer`**](https://github.com/sorge-it/cdp-browser-installer) | this README | installing a pinned, SHA-256-checked `chrome-headless-shell` and `chromedriver` as a Composer dev dependency | `chrome-headless-shell` and `chromedriver` of one version from Chrome for Testing, for Linux and macOS on x64 and arm64 | no | yes, in the pin file | yes, before each unpack | yes, for each version and platform | no: Composer refuses it, as it requires `ext-posix` |
 | [`@puppeteer/browsers`](https://www.npmjs.com/package/@puppeteer/browsers) | 3.2.6, 2026-10-22 | downloading and launching browsers | `chrome-headless-shell` and other browsers, by build or by alias | 22.12 or later | in the command line, not in a file: the caller names a build or an alias | when the caller of the API passes `expectedHash`; the CLI passes none | no | yes: `win32` and `win64` |
 | [`puppeteer`](https://www.npmjs.com/package/puppeteer) | 25.16.0, 2026-10-22 | controlling headless Chrome over the DevTools Protocol | `chrome` and `chrome-headless-shell`, through `@puppeteer/browsers`, on `npm install` | 22.12 or later | yes, one version for each release | no | no | yes, through `@puppeteer/browsers` |
 | [`playwright-core`](https://www.npmjs.com/package/playwright-core) | 1.64.1, 2026-10-14 | automating web browsers | `chromium-headless-shell`, from its own mirror `cdn.playwright.dev` | 20 or later | yes, in `browsers.json` | no | yes | yes: `win64` |
@@ -310,9 +490,10 @@ columns:
 - `curl`, plus Info-ZIP UnZip 6.00 and ZipInfo 3.00, which both come with the `unzip` package.
   safe-unzip checks the version of both tools before it reads an archive. macOS ships `curl` and
   `unzip`; on Debian and Ubuntu, `deps` installs them.
-- Linux with glibc, or macOS, on x64 or arm64. On musl, as on Alpine, the installer uses the
-  system's `chromium` instead (see [Alpine](#alpine-and-other-musl-systems)). Composer refuses to install the package
-  on Windows: the package requires `ext-posix`, and PHP has no `ext-posix` on Windows. On other
+- Linux with glibc, or macOS, on x64 or arm64. On musl, as on Alpine, `install` and `path` stop
+  until `CDP_BROWSER_CHROME` and `CDP_BROWSER_CHROMEDRIVER` name the system's `chromium` and
+  `chromedriver` (see [Alpine](#alpine-and-other-musl-systems)). Composer refuses to install the
+  package on Windows: the package requires `ext-posix`, and PHP has no `ext-posix` on Windows. On other
   platforms, the installer stops with an `InstallerException`.
 
 Ubuntu 24.04 ships PHP 8.3; there, install PHP 8.4, for example from `ppa:ondrej/php`.
@@ -322,7 +503,7 @@ Ubuntu 24.04 ships PHP 8.3; there, install PHP 8.4, for example from `ppa:ondrej
 The rest of this file is reference:
 [How it works](#how-it-works) · [Security](#security) ·
 [Limits of the security model](#limits-of-the-security-model) · [Commands](#commands) ·
-[Environment variables](#environment-variables) · [Where the browser goes](#where-the-browser-goes) ·
+[Environment variables](#environment-variables) · [Where the pair goes](#where-the-pair-goes) ·
 [Alpine](#alpine-and-other-musl-systems) · [API](#api) · [Exceptions](#exceptions) ·
 [Tests](#tests) · [Development](#development)
 
@@ -345,7 +526,7 @@ Composer trusts `unzip`. This installer adds checks before and after it:
 | Before unpacking | `zipinfo -h`, `zipinfo -v` | each line against a closed grammar, then safe-unzip's "standard ZIP" profile: methods, hosts, flags, extra fields, names, types, counts, offsets, and fixed header fields read at the offsets of the listing |
 | Check pass | `unzip -p` | each entry decompresses into a pipe and has the size and the CRC-32 of the listing; nothing is written |
 | Unpacking | `unzip -q` | the written tree holds exactly the files of the listing, with their sizes and CRC-32, and no link; safe-unzip sets each mode without write access for group and others |
-| Into place | `rm -rf` of the temporary directories | a lock per version and platform, the old browser aside, the new one in, one rename each |
+| Into place | `rm -rf` of the temporary directories | a lock per version and platform, for each binary the old tree aside and the new one in, one rename each; the stamp of the pair after both |
 
 The installer unpacks with `SorgeIt\SafeUnzip\ZipArchive` from
 [`sorge-it/safe-unzip`](https://github.com/sorge-it/safe-unzip): the reading interface of PHP's
@@ -363,7 +544,8 @@ environment decides what runs.
 
 Each rule names the code that implements it. A test in `tests/` proves each rule except rule 7.
 
-1. **Pinned.** One version, one SHA-256 for each platform, in a file in your repository (`Pin`).
+1. **Pinned.** One version, one SHA-256 for each binary and each platform, in a file in your
+   repository (`Pin`).
    `pin` first compares each download with the MD5 in `x-goog-hash` (`PinCommand`).
 2. **One source.** Downloads come only from `https://storage.googleapis.com/chrome-for-testing-public/`
    (`Download::SOURCE`). `curl -q` reads no `.curlrc`. `--proto =https --tlsv1.2` allows only
@@ -375,11 +557,13 @@ Each rule names the code that implements it. A test in `tests/` proves each rule
    that unpacks removes it, 120 seconds after its last write (rule 5). `pin` removes its own
    directory with each download in it.
 3. **Checked before unpacked.** A SHA-256 that differs from the pin file stops the install and
-   deletes the archive (`Installer::verify`). The check runs once before each unpack: on a new
-   download, and on an archive that a CI cache restored. The install checks and unpacks a file
-   of its own: it downloads into a `.part-*` file, or renames the restored archive to one, and
-   moves the file back into the cache after the unpack. A browser whose binary and stamp match
-   the pin file counts as installed, and its archive is not read again.
+   deletes the archive (`Installer::verify`). The other binary can already be unpacked, but
+   without a new stamp the pair counts as not installed. The check runs once before each unpack:
+   on a new download, and on an archive that a CI cache restored. The install does each binary in
+   turn: it gets the archive, checks it, unpacks it and puts it back into the cache. It checks
+   and unpacks a file of its own: a download goes into a `.part-*` file, and a restored archive
+   is renamed to one. A pair whose two binaries and stamp match the pin file counts as installed,
+   and its archives are not read again.
 4. **No entry outside the target.** safe-unzip parses `zipinfo -v` with a closed grammar and
    checks the archive against its "standard ZIP" profile before `unzip` writes a byte. The install
    stops at any of these: a line that the grammar does not know, a method other than store and
@@ -394,23 +578,23 @@ Each rule names the code that implements it. A test in `tests/` proves each rule
    and no link. Every tool runs with `LC_ALL=C`, and without the variables `UNZIP`, `UNZIPOPT`,
    `ZIPINFO` and `ZIPINFOOPT`, which would add options from the environment.
 5. **One install at a time.** A lock file per version and platform makes a second install wait
-   for the first one, and then find the browser installed. An install that finds the browser
-   installed takes no lock and leaves the files of a stopped run in place; the next run that
-   unpacks removes them. `install` replaces a browser of the same version when the binary or its
-   stamp is missing, or when the stamp holds the SHA-256 of another archive. Then the old tree
-   moves aside and the new one moves in, with one rename each, and the old tree is removed
-   (`Installer`). A browser that still runs from the old tree keeps only the files it has open.
-   Where the lock does not exclude a second process, as on a Docker Desktop bind mount on macOS,
-   each install downloads its own file, checks it and unpacks it. Another archive that a second
-   run puts at the path of the cache meanwhile does not change what the first run unpacks. An
-   install that finds the browser installed after it has unpacked keeps that browser and removes
-   its own tree.
+   for the first one, and then find the pair installed. An install that finds the pair installed
+   takes no lock and leaves the files of a stopped run in place; the next run that unpacks
+   removes them. The stamp `.sha256-pair` holds one line for each binary. `install` unpacks both
+   binaries again when a binary or the stamp is missing, or when the stamp names another archive.
+   The install removes the stamp before it moves the first tree, and writes a new stamp when both
+   trees are in place. The old tree moves aside and the new one moves in, with one rename each,
+   and the old tree is removed (`Installer`). A binary that still runs from the old tree keeps
+   only the files it has open. Release 2.x does not read the stamp `.sha256` of release 1.x, so
+   its first install unpacks the browser again. Where the lock does not exclude a second process,
+   as on a Docker Desktop bind mount on macOS, of two installs that run at the same time, one can
+   end with exit code 1; run it again.
 6. **Root only for the package manager.** Only `deps` needs root. It installs a fixed package
    list from the system's signed sources (`SystemLibraries`). It finds `apk` or `apt-get` in
    `PATH`, passes the caller's environment plus `DEBIAN_FRONTEND=noninteractive`, and runs it
    without a timeout, so that no timeout leaves dpkg half configured; Ctrl-C or SIGKILL still can.
    The commands `install` and `pin` stop as root without `--allow-root` (`Cli::refuseRoot`);
-   `path` and `install` with `CDP_BROWSER_BINARY` write nothing; `path` and the PHP API do not
+   `path`, and `install` with the system's pair, write nothing; `path` and the PHP API do not
    check the user.
 7. **No shell.** Every process starts from an argument list (`CommandLine`); no test scans the
    code for a shell call. The installer looks a tool up in the `PATH` that the process gets, where
@@ -427,12 +611,12 @@ Each rule names the code that implements it. A test in `tests/` proves each rule
   line that says so, and still writes the pin file. The MD5 and the archive come from the same
   server: the MD5 detects a broken download, not a changed source.
 - **The lock on a shared file system.** On a Docker Desktop bind mount on macOS, `flock()` did not
-  exclude a second process (measured on 2026-10-30). Rule 5 keeps the browser intact there, but
-  each install downloads the archive. NFS and bind mounts on a Linux host are not measured.
-- **No later check of an installed browser.** The SHA-256 covers the archive before the unpack,
-  not the files after it. A changed file of an installed browser stays undetected while its
-  binary and stamp match the pin file. To check it again, remove `<cache>/<version>/` and run
-  `install`.
+  exclude a second process (measured on 2026-10-30). There, of two installs that run at the same
+  time, one can end with exit code 1; run it again. NFS and bind mounts on a Linux host are not
+  measured.
+- **No later check of an installed pair.** The SHA-256 covers each archive before the unpack, not
+  the files after it. A changed file of an installed pair stays undetected while its binaries and
+  stamp match the pin file. To check it again, remove `<cache>/<version>/` and run `install`.
 - **Rosetta.** `Platform::current()` reads `php_uname('m')`. An x64 build of PHP that runs through
   Rosetta 2 on Apple silicon reports `x86_64` and installs `mac-x64`, which then also runs through
   Rosetta. Not measured; use an arm64 build of PHP.
@@ -440,9 +624,9 @@ Each rule names the code that implements it. A test in `tests/` proves each rule
   such as `libasound2t64`. They exist on Debian 13 and on Ubuntu 24.04 and later; CI checks the
   list on minimal images of Debian 13 and Ubuntu 26.04. On an older release, apt stops at the
   first unknown name, and so does `deps`. There, install the libraries that
-  `ldd chrome-headless-shell` lists yourself.
-- **Two timeouts.** The lock timeout (600 seconds) covers the whole install of the other run: a
-  download and each run of `zipinfo` and `unzip`, each of which can take up to the tool timeout
+  `ldd chrome-headless-shell chromedriver` lists yourself.
+- **Two timeouts.** The lock timeout (600 seconds) covers the whole install of the other run: both
+  downloads and each run of `zipinfo` and `unzip`, each of which can take up to the tool timeout
   (900 seconds). On a slow connection, a second install can stop at the lock while the first one
   is still running. There, set `CDP_BROWSER_LOCK_TIMEOUT` above the duration of one install.
 - **Old versions stay.** A new pin installs into a new directory `<cache>/<version>/`. No command
@@ -452,10 +636,10 @@ Each rule names the code that implements it. A test in `tests/` proves each rule
 
 | Command | Does | Runs as |
 |---|---|---|
-| `pin <version>` | Checks that it can write the pin file and that the real path of its temporary directory has no refused character, then downloads the archive for each platform, compares its MD5 with the one the storage sends, unpacks it once with the checks of `install`, and writes the version and each SHA-256 to the pin file | a normal user; root with `--allow-root` |
-| `install` | Installs the pinned version for this platform, or checks the browser in `CDP_BROWSER_BINARY`, and prints the path in its message; a script reads the path from `path` | a normal user; root with `--allow-root`, or with `CDP_BROWSER_BINARY` |
-| `path` | Prints the path of the browser; it writes nothing | any user, including root |
-| `deps` | Installs `curl`, `unzip` and the browser's libraries through apt, or Alpine's `chromium` through apk; on macOS it does nothing. For the systems, see [Older distributions](#limits-of-the-security-model) | root |
+| `pin <version>` | Checks that it can write the pin file and that the real path of its temporary directory has no refused character, then downloads the archive of each binary for each platform, compares its MD5 with the one the storage sends, unpacks it once with the checks of `install`, and writes the version and each SHA-256 to the pin file | a normal user; root with `--allow-root` |
+| `install` | Installs the pinned pair for this platform, or checks the system's pair in `CDP_BROWSER_CHROME` and `CDP_BROWSER_CHROMEDRIVER`, and prints both paths in its message; a script reads a path from `path` | a normal user; root with `--allow-root`, or with the system's pair |
+| `path <binary>` | Prints the path of `chrome-headless-shell` or `chromedriver`; without a name it stops and names both; it writes nothing | any user, including root |
+| `deps` | Installs `curl`, `unzip` and the libraries of the pair through apt, or Alpine's `chromium` and `chromium-chromedriver` through apk; on macOS it does nothing. For the systems, see [Older distributions](#limits-of-the-security-model) | root |
 
 | Option | Commands | Does |
 |---|---|---|
@@ -471,12 +655,12 @@ unchanged, and ends with the `EXIT_CODE` of its class; 75 and 65 come from `syse
 |---|---|---|
 | 75 (`EX_TEMPFAIL`) | `DownloadException` | run the command again |
 | 65 (`EX_DATAERR`) | `ChecksumException` | stop: the bytes are not the pinned ones |
-| 1 | `InstallerException` | stop: a human fixes the cause in the message |
+| 1 | `InstallerException` | stop: a human fixes the cause in the message. When another install removed a file of this one, run `install` again |
 
 Any other exception, such as a bug, is shown in Symfony's format and ends with exit code 1.
 `install` prints `Download <url>` before each download, as `pin` does.
 
-`install` and `pin` stop when they run as root: a browser or a pin file owned by root breaks the
+`install` and `pin` stop when they run as root: a pair or a pin file owned by root breaks the
 next run as a normal user, who cannot replace it. In a container where only root runs, as in a
 Dockerfile `RUN`, `--allow-root` accepts that risk:
 
@@ -484,22 +668,33 @@ Dockerfile `RUN`, `--allow-root` accepts that risk:
 RUN vendor/bin/cdp-browser deps && vendor/bin/cdp-browser install --allow-root
 ```
 
-A later run as another user, such as the tests, finds the browser installed and needs no write
+A later run as another user, such as the tests, finds the pair installed and needs no write
 access to the cache.
 
 No environment variable sets this option; add it to the command line. Only the commands `install`
-and `pin` refuse root: `path` writes nothing, and `Installer::install()` from PHP, as in a test
-tool, runs as any user, including root. With `CDP_BROWSER_BINARY`, `install` only checks the
-system's browser and writes nothing, so it runs as root without `--allow-root`.
+and `pin` refuse root: `path` writes nothing, and `Installer::binaries()` and `Installer::install()` from PHP, as in a test
+tool, runs as any user, including root. With the system's pair, `install` only checks it and
+writes nothing, so it runs as root without `--allow-root`.
 
 ## Environment variables
 
 | Variable | Default | Does |
 |---|---|---|
-| `CDP_BROWSER_BINARY` | none | an absolute path to the system's browser, such as `/usr/bin/chromium`; `install` then downloads nothing and needs no cache |
+| `CDP_BROWSER_CHROME` | none | an absolute path to the system's browser, such as `/usr/bin/chromium`. Only together with `CDP_BROWSER_CHROMEDRIVER`: with both, `install` downloads nothing and needs no cache |
+| `CDP_BROWSER_CHROMEDRIVER` | none | an absolute path to the system's ChromeDriver, such as `/usr/bin/chromedriver`. Only together with `CDP_BROWSER_CHROME` |
 | `CDP_BROWSER_PATH` | `$XDG_CACHE_HOME/cdp-browser` if `XDG_CACHE_HOME` is absolute, else `~/.cache/cdp-browser` | the cache directory (see below) |
-| `CDP_BROWSER_TIMEOUT` | `900` | the timeout in seconds for each tool that `install`, `path` and `pin` start: one `curl` download, each run of `zipinfo` and `unzip`, and `--version` of `CDP_BROWSER_BINARY`. `deps` has no timeout |
-| `CDP_BROWSER_LOCK_TIMEOUT` | `600` | how many seconds an install waits for another install in the same version directory, `<cache>/<version>/<platform>/`. `install` and `path` read it together with the cache; with `CDP_BROWSER_BINARY` set, and in `pin` and `deps`, it is not read |
+| `CDP_BROWSER_TIMEOUT` | `900` | the timeout in seconds for each tool that `install`, `path` and `pin` start: one `curl` download, each run of `zipinfo` and `unzip`, and `--version` of each binary of the system's pair. `deps` has no timeout |
+| `CDP_BROWSER_LOCK_TIMEOUT` | `600` | how many seconds an install waits for another install in the same version directory, `<cache>/<version>/<platform>/`. `install` and `path` read it together with the cache; with the system's pair, and in `pin` and `deps`, it is not read |
+
+A browser of the system with a pinned ChromeDriver, or the reverse, can differ in version. So
+`install`, `path` and `Installer::fromEnvironment()` stop with exit code 1 when only one of
+`CDP_BROWSER_CHROME` and `CDP_BROWSER_CHROMEDRIVER` is set, and name the other. `pin` and `deps`
+read neither variable.
+
+Release 2.x does not read `CDP_BROWSER_BINARY`, the variable of release 1.x. When it is set and not
+empty, `install`, `path` and `Installer::fromEnvironment()` stop with exit code 1 and do not use
+its value. The message names `CDP_BROWSER_CHROME` and `CDP_BROWSER_CHROMEDRIVER`: set both for the
+system's pair, or unset `CDP_BROWSER_BINARY` for the pinned pair.
 
 Both timeouts take a whole number of seconds above 0, in digits only, without a sign, a leading
 zero or a space: `900`, not `15m`, `1e3`, `+900`, ` 900` or `0900`. `0` is refused: it would mean
@@ -508,10 +703,11 @@ value stops the command that reads it with an `InstallerException`. An empty var
 not set, as with `CDP_BROWSER_PATH`. `curl` also stops on its own when the speed stays below
 1 KiB/s for 60 seconds.
 
-## Where the browser goes
+## Where the pair goes
 
-`install` puts the browser under `<cache>/<version>/<platform>/`, next to the archive it came
-from:
+`install` puts the pair under `<cache>/<version>/<platform>/`: `chrome-headless-shell-<platform>/`
+and `chromedriver-<platform>/` side by side, each next to the archive it came from, and the
+stamp `.sha256-pair` with the SHA-256 of both archives. The cache directory is:
 
 1. `CDP_BROWSER_PATH`, if set (a relative path is resolved against the working directory),
 2. else `$XDG_CACHE_HOME/cdp-browser`, if `XDG_CACHE_HOME` is absolute; as the XDG Base
@@ -527,12 +723,13 @@ five as a pattern, and `zipinfo` prints a line break as two lines, so safe-unzip
 real path of the archive (see [How it works](#how-it-works)). `pin` refuses these
 characters in the real path of its temporary directory, from `TMPDIR` or `sys_temp_dir`, before
 the first download. The constructor of `Installer` checks its cache directory the same way as
-`install`, and takes no relative path. With `CDP_BROWSER_BINARY`, the installer needs no cache
-directory; a relative path in `CDP_BROWSER_BINARY` stops the command.
+`install`, and takes no relative path. With the system's pair, the installer needs no cache
+directory; a relative path in `CDP_BROWSER_CHROME` or `CDP_BROWSER_CHROMEDRIVER` stops the
+command.
 
 In a container, set `CDP_BROWSER_PATH` to a directory in the project, so that the next container
-finds the browser of the previous one. To start the browser, see
-[Run the browser](#run-the-browser).
+finds the pair of the previous one. To start the browser, see
+[Run the browser and ChromeDriver](#run-the-browser-and-chromedriver).
 
 ## Alpine and other musl systems
 
@@ -542,22 +739,29 @@ of the chromium package: `chrome-headless-shell` 155.0.8059.39 for `linux-arm64`
 code 127 and "unsupported relocation type 1032", and glibc symbols such as `__memcpy_chk` are
 missing. Playwright does not support Alpine; Puppeteer, Symfony Panther, chrome-php and
 Browsershot use Alpine's `chromium` and an environment variable with its path. This installer
-does the same:
+does the same, for the pair:
 
 ```sh
-vendor/bin/cdp-browser deps                                  # as root: apk add chromium nss freetype harfbuzz ttf-freefont
-CDP_BROWSER_BINARY=/usr/bin/chromium vendor/bin/cdp-browser install
+vendor/bin/cdp-browser deps   # as root: apk add --no-cache chromium chromium-chromedriver nss freetype harfbuzz ttf-freefont
+CDP_BROWSER_CHROME=/usr/bin/chromium CDP_BROWSER_CHROMEDRIVER=/usr/bin/chromedriver vendor/bin/cdp-browser install
 ```
 
-Without `CDP_BROWSER_BINARY`, `install` detects musl (`getconf`, then the loader in the memory
-maps of the PHP process, then the loader file) and stops before it downloads; its message names
-the two commands above. `path` stops with the same message. The version of `chromium` is
-Alpine's, not the pin file's: on the same day, Alpine 3.24 shipped `chromium` 155.0.8059.84. On a
-musl system without apk, `deps` stops; install Chromium yourself there and set
-`CDP_BROWSER_BINARY` to its path.
+Without the two variables, `install` detects musl (`getconf`, then the loader in the memory maps
+of the PHP process, then the loader file) and stops before it downloads; its message names
+`deps` and the two variables with their paths. `path` stops with the same message. The version of
+the pair is Alpine's, not the pin file's: on 2026-11-03, Alpine 3.24 shipped `chromium` and
+`chromium-chromedriver` 156.0.8078.79, both from one build, and `php-webdriver/webdriver` and
+`symfony/panther` read a page through them. On a musl system without apk, `deps` stops; install
+Chromium and its ChromeDriver yourself there and set both variables to their paths.
 
-`path` then prints the path of that `chromium`. It is the full Chromium, not the headless shell.
-Without a display, start it with `--headless`:
+Alpine's `chromium` is the full Chromium, not the headless shell. In the examples for
+`php-webdriver/webdriver` and `laravel/dusk`, add `--headless` to the arguments of `ChromeOptions`
+there: without it, ChromeDriver stops with `session not created: Chrome instance exited`.
+Panther adds `--headless` itself. Measured by hand on 2026-11-03; the job `works-with` does not
+run on Alpine.
+
+`path chrome-headless-shell` then prints the path of that `chromium`. It is the full Chromium,
+not the headless shell. Without a display, start it with `--headless`:
 
 ```sh
 /usr/bin/chromium --headless --no-sandbox --dump-dom 'data:text/html,<p>ok</p>'
@@ -566,29 +770,47 @@ Without a display, start it with `--headless`:
 ## API
 
 These classes and members are the API; SemVer covers them. Only a new major release breaks them,
-and the CHANGELOG marks each break as **Breaking**; Composer's `^1.0` takes no such release:
+and the CHANGELOG marks each break as **Breaking**; Composer's `^2.0` takes no such release:
 
 ```php
 namespace SorgeIt\CdpBrowserInstaller;
 
 final readonly class Installer
 {
-    public const string OWN_BROWSER = 'CDP_BROWSER_BINARY';
+    public const string OWN_CHROME = 'CDP_BROWSER_CHROME';
+    public const string OWN_CHROMEDRIVER = 'CDP_BROWSER_CHROMEDRIVER';
     public const string TIMEOUT = 'CDP_BROWSER_TIMEOUT';
     public const string LOCK_TIMEOUT = 'CDP_BROWSER_LOCK_TIMEOUT';
 
-    public function __construct(CommandLine $commandLine, ?string $cache, ?string $ownBrowser = null, ?bool $musl = null, int $lockTimeout = 600);
+    public function __construct(CommandLine $commandLine, ?string $cache, ?Binaries $own = null, ?bool $musl = null, int $lockTimeout = 600);
     /** @param array<string, string> $environment */
     public static function fromEnvironment(array $environment, CommandLine $commandLine = new CommandLine, ?bool $musl = null): self;
     /** @param array<string, string> $environment */
     public static function cache(array $environment): string;
     /** @param (\Closure(string): void)|null $onDownload gets the URL before each download */
-    public function browser(string $pinFile, Platform $platform, ?\Closure $onDownload = null): string;
+    public function binaries(string $pinFile, Platform $platform, ?\Closure $onDownload = null): Binaries;
     /** @param (\Closure(string): void)|null $onDownload gets the URL before each download */
-    public function install(Pin $pin, Platform $platform, ?\Closure $onDownload = null): string;
-    public function binary(Pin $pin, Platform $platform): string;
+    public function install(Pin $pin, Platform $platform, ?\Closure $onDownload = null): Binaries;
+    public function paths(Pin $pin, Platform $platform): Binaries;
     public function isInstalled(Pin $pin, Platform $platform): bool;
-    public function ownBrowser(): ?string;
+    public function ownBinaries(): ?Binaries;
+}
+
+final readonly class Binaries
+{
+    public function __construct(string $chromeHeadlessShell, string $chromedriver);
+    public function path(Binary $binary): string;
+}
+
+enum Binary: string
+{
+    case ChromeHeadlessShell = 'chrome-headless-shell';
+    case Chromedriver = 'chromedriver';
+
+    public function variable(): string;
+    public function alpinePath(): string;
+    public function directory(Platform $platform): string;
+    public function path(Platform $platform): string;
 }
 
 final readonly class CommandLine
@@ -602,12 +824,12 @@ final readonly class Pin
     public const string FILE = '.chrome-version';
     public string $version;
 
-    /** @param array<string, string> $hashes the SHA-256 for each value of Platform */
+    /** @param array<string, array<string, string>> $hashes the SHA-256 for each value of Binary and each value of Platform */
     public function __construct(string $version, array $hashes);
     public static function checkVersion(string $version): void;
     public static function read(string $file): self;
     public function write(string $file): void;
-    public function hash(Platform $platform): string;
+    public function hash(Binary $binary, Platform $platform): string;
 }
 
 enum Platform: string
@@ -617,12 +839,8 @@ enum Platform: string
     case MacX64 = 'mac-x64';
     case MacArm64 = 'mac-arm64';
 
-    public const string BINARY = 'chrome-headless-shell';
-
     public static function detect(string $family, string $machine): self;
     public static function current(): self;
-    public function directory(): string;
-    public function binary(): string;
 }
 
 class InstallerException extends \RuntimeException { public const int EXIT_CODE = 1; }
@@ -638,13 +856,14 @@ throws an `InstallerException`. `fromEnvironment()` takes the timeout of `$comma
 seconds for the lock, unless the environment variables set other values.
 
 Each tool gets PHP's environment plus the variables in `$environment`: `curl`, `rm`, `getconf`,
-the package manager, `CDP_BROWSER_BINARY`, and `zipinfo` and `unzip` through safe-unzip.
+the package manager, each binary of the system's pair, and `zipinfo` and `unzip` through
+safe-unzip.
 
 The rest is `@internal` and can change in any release: the command classes of `bin/cdp-browser`
 (`Console\*`), the steps of an install (`Download`, `Unpack`, `Libc`, `SystemLibraries`,
 `Environment`, `Files`), every method of `CommandLine`, `Installer::onMusl()`, and the
 constructors of the three exceptions. The API covers what a test tool calls: find, install and
-check a browser, and tell a failed download from a wrong SHA-256. How the installer starts a tool
+check the pair, and tell a failed download from a wrong SHA-256. How the installer starts a tool
 or unpacks an archive is not part of it. `CommandLine` is part of the API only for its
 constructor, the one place where a caller sets the environment and the timeout of the tools.
 
@@ -662,8 +881,8 @@ that exception, one level deep: for the tool timeout (`CDP_BROWSER_TIMEOUT`), it
 | Class | When | What the caller can do |
 |---|---|---|
 | `DownloadException` | `curl` stops with an exit code, a signal or the tool timeout, or the source answers with a status other than 200 or 404; no archive is left, only a `.part-*` file that the run could not delete (see rule 2 under [Security](#security)) | a retry can help after a network error or a 5xx status; the message names the status or the exit code. Only a 3xx status names the redirect |
-| `ChecksumException` | the SHA-256 of the archive differs from the pin file; nothing is unpacked. In `pin`: the MD5 of a download differs from the one in `x-goog-hash`; no pin file is written | after a new download, a retry does not help: the bytes are not the pinned ones. If the run deleted an archive from the cache, a retry downloads it again. The message names what happened to the archive. In `pin`, a retry downloads again; the message names the platform and both MD5 values |
-| `InstallerException` | every other cause: a value of the environment, an option or an argument; the user; the pin file; a version that the source does not have for the platform (status 404), such as a wrong version for `pin`; the platform or musl; `CDP_BROWSER_BINARY`; a missing tool, also `curl`; a tool other than `curl` that stops; safe-unzip refuses the archive or finds it broken, or the archive holds no binary of the platform; the file system; the lock of another install; `path` before `install` | a human fixes the cause that the message names |
+| `ChecksumException` | the SHA-256 of an archive differs from the pin file; that archive is deleted and not unpacked, and the pair counts as not installed. In `pin`: the MD5 of a download differs from the one in `x-goog-hash`; no pin file is written | after a new download, a retry does not help: the bytes are not the pinned ones. If the run deleted an archive from the cache, a retry downloads it again. The message names what happened to the archive. In `pin`, a retry downloads again; the message names the binary, the platform and both MD5 values |
+| `InstallerException` | every other cause: a value of the environment, an option or an argument; the user; the pin file, also one of release 1.x; a version that the source does not have for the platform (status 404), such as a wrong version for `pin`; the platform or musl; `CDP_BROWSER_CHROME` or `CDP_BROWSER_CHROMEDRIVER`, also only one of them; `CDP_BROWSER_BINARY` of release 1.x; a missing tool, also `curl`; a tool other than `curl` that stops; safe-unzip refuses the archive or finds it broken, or the archive holds no binary of the platform; the file system; the lock of another install; `path` without the name of a binary, or before `install` | a human fixes the cause that the message names |
 
 `install` unpacks only after the SHA-256 has matched the pin file, and `pin` computes the SHA-256
 from the same bytes. So a refusal by safe-unzip is an `InstallerException`, not a
@@ -690,7 +909,8 @@ composer test:coverage  # line coverage 100 %, with pcov; a CI job
 The suite runs on Symfony 8: Pest 5 requires `symfony/process` 8.1. `composer.json` also allows
 Symfony 7.4.8 or later. The CI job `symfony-7` installs the package at the lowest versions,
 without its development packages: Symfony 7.4.8. It runs `deps`, `install`, `path`, the
-browser's `--version`, and the refusal of an archive with one byte added.
+`--version` of the browser and of `chromedriver`, and the refusal of each archive with one byte
+added.
 
 ## Development
 
@@ -702,8 +922,9 @@ Report a vulnerability privately through GitHub; see
 
 ## License
 
-MIT, see [LICENSE](https://github.com/sorge-it/cdp-browser-installer/blob/main/LICENSE). Chrome for Testing has its own license; the archive contains it as
-`LICENSE.headless_shell`.
+MIT, see [LICENSE](https://github.com/sorge-it/cdp-browser-installer/blob/main/LICENSE). Chrome for Testing has its own licenses; the archive of
+`chrome-headless-shell` contains `LICENSE.headless_shell`, the archive of `chromedriver` contains
+`LICENSE.chromedriver`.
 
 ## About the author
 
@@ -725,7 +946,7 @@ Also by me:
 Chrome™ and Chromium™ are trademarks of Google LLC. This project names them only to identify
 these browsers:
 
-- Chrome for Testing, the browser that it installs,
+- Chrome for Testing, the browser and the ChromeDriver that it installs,
 - the system's Chromium, which it uses on musl,
 - the browsers in the comparison.
 

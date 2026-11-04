@@ -7,15 +7,15 @@ namespace SorgeIt\CdpBrowserInstaller;
 use JsonException;
 
 /**
- * One version of chrome-headless-shell and the SHA-256 of its archive for each platform. Chrome
- * for Testing publishes no SHA-256 and no signature; its storage sends an MD5 and a CRC32C.
- * So `pin` compares each download with the MD5 and computes its SHA-256; a human reviews the pin
- * file.
+ * One version of Chrome for Testing and the SHA-256 of each archive of the pair. Chrome for
+ * Testing publishes no SHA-256 and no signature; its storage sends an MD5 and a CRC32C. So `pin`
+ * compares each download with the MD5 and computes its SHA-256; a human reviews the pin file.
  */
 final readonly class Pin
 {
     /**
-     * The pin file in the working directory, where each command looks without `--pin-file`.
+     * The pin file in the working directory, where `pin`, `install` and `path` look without
+     * `--pin-file`.
      */
     public const string FILE = '.chrome-version';
 
@@ -27,17 +27,19 @@ final readonly class Pin
     private const string SHA256 = '/\A[0-9a-f]{64}\z/';
 
     /**
-     * @param  array<string, string>  $hashes  the SHA-256 for each value of `Platform`
+     * @param  array<string, array<string, string>>  $hashes  the SHA-256 for each value of `Binary` and each value of `Platform`
      */
     public function __construct(public string $version, private array $hashes)
     {
         self::checkVersion($version);
 
-        foreach (Platform::cases() as $platform) {
-            $hash = $hashes[$platform->value] ?? '';
+        foreach (Binary::cases() as $binary) {
+            foreach (Platform::cases() as $platform) {
+                $hash = $hashes[$binary->value][$platform->value] ?? '';
 
-            if (preg_match(self::SHA256, $hash) !== 1) {
-                throw new InstallerException(sprintf('The pin of %s has no valid SHA-256 for %s.', $version, $platform->value));
+                if (preg_match(self::SHA256, $hash) !== 1) {
+                    throw new InstallerException(sprintf('The pin of %s has no valid SHA-256 of %s for %s.', $version, $binary->value, $platform->value));
+                }
             }
         }
     }
@@ -55,7 +57,7 @@ final readonly class Pin
             throw new InstallerException(sprintf('There is no pin file at %s. Write one with `cdp-browser pin <version>`.', $file));
         }
 
-        $content = @file_get_contents($file);
+        $content = Files::quietly(static fn (): string|false => file_get_contents($file));
 
         if ($content === false) {
             throw new InstallerException(sprintf('The pin file %s could not be read.', $file));
@@ -67,15 +69,29 @@ final readonly class Pin
             throw new InstallerException(sprintf('The pin file %s is not valid JSON: %s.', $file, $jsonException->getMessage()), $jsonException);
         }
 
-        if (! is_array($data) || ! is_string($data['version'] ?? null) || ! is_array($data['sha256'] ?? null)) {
-            throw new InstallerException(sprintf('The pin file %s needs `version` and `sha256`.', $file));
+        if (! is_array($data) || ! is_string($data['version'] ?? null)) {
+            throw self::incomplete($file);
+        }
+
+        // The form of version 1 pins the browser only. Its hashes cannot become a pair.
+        if (array_key_exists('sha256', $data)) {
+            // The message prints the version, so only a checked one reaches the terminal.
+            self::checkVersion($data['version']);
+
+            throw new InstallerException(sprintf('The pin file %s pins chrome-headless-shell only, in the form of version 1. Write it again with `cdp-browser pin %s`: it pins chrome-headless-shell and chromedriver.', $file, $data['version']));
         }
 
         $hashes = [];
 
-        foreach ($data['sha256'] as $platform => $hash) {
-            if (is_string($platform) && is_string($hash)) {
-                $hashes[$platform] = $hash;
+        foreach (Binary::cases() as $binary) {
+            if (! is_array($data[$binary->value] ?? null)) {
+                throw self::incomplete($file);
+            }
+
+            foreach ($data[$binary->value] as $platform => $hash) {
+                if (is_string($platform) && is_string($hash)) {
+                    $hashes[$binary->value][$platform] = $hash;
+                }
             }
         }
 
@@ -84,21 +100,28 @@ final readonly class Pin
 
     public function write(string $file): void
     {
-        $hashes = [];
+        $data = ['version' => $this->version];
 
-        foreach (Platform::cases() as $platform) {
-            $hashes[$platform->value] = $this->hash($platform);
+        foreach (Binary::cases() as $binary) {
+            foreach (Platform::cases() as $platform) {
+                $data[$binary->value][$platform->value] = $this->hash($binary, $platform);
+            }
         }
 
-        $json = json_encode(['version' => $this->version, 'sha256' => $hashes], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
         if (! Files::write(Files::target($file), $json."\n")) {
             throw new InstallerException(sprintf('The pin file %s could not be written.', $file));
         }
     }
 
-    public function hash(Platform $platform): string
+    public function hash(Binary $binary, Platform $platform): string
     {
-        return $this->hashes[$platform->value];
+        return $this->hashes[$binary->value][$platform->value];
+    }
+
+    private static function incomplete(string $file): InstallerException
+    {
+        return new InstallerException(sprintf('The pin file %s needs `version`, `%s` and `%s`.', $file, Binary::ChromeHeadlessShell->value, Binary::Chromedriver->value));
     }
 }

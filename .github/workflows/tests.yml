@@ -213,8 +213,8 @@ jobs:
             su www-data -s /bin/sh -c "cd /work && export COMPOSER_HOME=/tmp/composer && composer install --no-interaction --no-progress && composer test"
           '
 
-  # The real browser of `.chrome-version` on each platform: install from Chrome for Testing, or
-  # from the cache, then a page through the binary.
+  # The real pair of `.chrome-version` on each platform: install from Chrome for Testing, or from
+  # the cache, then a page through the browser and the version of chromedriver.
   browser:
     name: Browser · ${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
@@ -253,10 +253,10 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-dev
 
-      # Only the archive: its SHA-256 is in the pin file of the repository, and the installer checks
-      # it after the restore. zizmor's finding of cache poisoning: a forged entry can restore other
-      # paths too, but this workflow publishes nothing, reads only contents and uses no secret.
-      - name: Cache the archive # zizmor: ignore[cache-poisoning]
+      # Only the archives: their SHA-256 is in the pin file of the repository, and the installer
+      # checks it after the restore. zizmor's finding of cache poisoning: a forged entry can restore
+      # other paths too, but this workflow publishes nothing, reads only contents and uses no secret.
+      - name: Cache the archives # zizmor: ignore[cache-poisoning]
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache/cdp-browser/*/*/*.zip
@@ -265,7 +265,7 @@ jobs:
       - name: Install the system libraries
         run: sudo "$(command -v php)" bin/cdp-browser deps
 
-      - name: Install the browser
+      - name: Install the pair
         run: |
           php bin/cdp-browser install
           php bin/cdp-browser install
@@ -273,7 +273,8 @@ jobs:
       # Ubuntu 24.04 blocks the user namespaces of the Chrome sandbox through AppArmor.
       - name: Load a page
         run: |
-          browser="$(php bin/cdp-browser path)"
+          "$(php bin/cdp-browser path chromedriver)" --version
+          browser="$(php bin/cdp-browser path chrome-headless-shell)"
           "$browser" --version
           if [ "$RUNNER_OS" = Linux ]; then set -- --no-sandbox; fi
           "$browser" "$@" --dump-dom 'data:text/html,<p>ok</p>' | grep -q '<p>ok</p>'
@@ -316,14 +317,16 @@ jobs:
             useradd --create-home tester
             chown -R tester /src
             runuser -u tester -- php bin/cdp-browser install
-            browser="$(runuser -u tester -- php bin/cdp-browser path)"
-            if ldd "$browser" | grep "not found"; then exit 1; fi
+            browser="$(runuser -u tester -- php bin/cdp-browser path chrome-headless-shell)"
+            chromedriver="$(runuser -u tester -- php bin/cdp-browser path chromedriver)"
+            if ldd "$browser" "$chromedriver" | grep "not found"; then exit 1; fi
+            runuser -u tester -- "$chromedriver" --version
             runuser -u tester -- "$browser" --no-sandbox --dump-dom "data:text/html,<p>ok</p>" | grep -q "<p>ok</p>"
           '
 
   # Chrome for Testing needs glibc. On Alpine `install` refuses to download and `path` gives the
-  # same message, `deps` installs the chromium of Alpine, and CDP_BROWSER_BINARY points `install`
-  # to it.
+  # same message, `deps` installs the chromium and chromium-chromedriver of Alpine, and
+  # CDP_BROWSER_CHROME and CDP_BROWSER_CHROMEDRIVER point `install` to them.
   alpine:
     name: Alpine · ${{ matrix.runner }}
     runs-on: ${{ matrix.runner }}
@@ -340,7 +343,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Refuse to download, install the chromium of Alpine, use it
+      - name: Refuse to download, install the pair of Alpine, use it
         run: |
           docker run --rm --volume "$PWD:/src" --workdir /src --entrypoint sh "$COMPOSER_IMAGE" -euc '
             composer install --no-interaction --no-progress --no-dev
@@ -349,11 +352,13 @@ jobs:
             chown -R tester /src
             if su tester -c "php bin/cdp-browser install" 2> refused.txt; then exit 1; fi
             grep -q "does not start on musl" refused.txt
-            if su tester -c "php bin/cdp-browser path" 2> refused.txt; then exit 1; fi
+            if su tester -c "php bin/cdp-browser path chromedriver" 2> refused.txt; then exit 1; fi
             grep -q "does not start on musl" refused.txt
-            browser="$(command -v chromium || command -v chromium-browser)"
-            su tester -c "CDP_BROWSER_BINARY=$browser php bin/cdp-browser install"
-            binary="$(su tester -c "CDP_BROWSER_BINARY=$browser php bin/cdp-browser path")"
+            pair="CDP_BROWSER_CHROME=$(command -v chromium) CDP_BROWSER_CHROMEDRIVER=$(command -v chromedriver)"
+            su tester -c "$pair php bin/cdp-browser install"
+            binary="$(su tester -c "$pair php bin/cdp-browser path chrome-headless-shell")"
+            chromedriver="$(su tester -c "$pair php bin/cdp-browser path chromedriver")"
+            su tester -c "$chromedriver --version"
             su tester -c "$binary --headless --no-sandbox --dump-dom data:text/html,%3Cp%3Eok%3C/p%3E" | grep -q "<p>ok</p>"
           '
 
@@ -394,22 +399,27 @@ jobs:
       - name: Install the system libraries
         run: sudo "$(command -v php)" bin/cdp-browser deps
 
-      - name: Install the browser and start it
+      - name: Install the pair and start it
         run: |
           php bin/cdp-browser install
-          browser="$(php bin/cdp-browser path)"
-          "$browser" --version
+          "$(php bin/cdp-browser path chrome-headless-shell)" --version
+          "$(php bin/cdp-browser path chromedriver)" --version
 
-      # As in the demo: without the browser and its stamp, `install` reads the archive in the cache.
-      - name: Refuse the archive with one byte added
+      # As in the demo: without the tree and the stamp, `install` reads the archive in the cache.
+      # The first `install` of each round downloads the archive that the round before deleted.
+      - name: Refuse each archive with one byte added
         run: |
-          tree="$(dirname "$(php bin/cdp-browser path)")"
-          rm -rf "$tree" "$(dirname "$tree")/.sha256"
-          printf x >> "$tree.zip"
-          status=0
-          php bin/cdp-browser install 2> "$RUNNER_TEMP/refused.txt" || status=$?
-          cat "$RUNNER_TEMP/refused.txt"
-          # The exit code of a ChecksumException.
-          test "$status" -eq 65
-          grep -q "The archive is deleted and nothing was unpacked." "$RUNNER_TEMP/refused.txt"
-          test ! -e "$tree.zip"
+          for binary in chrome-headless-shell chromedriver; do
+            php bin/cdp-browser install
+            tree="$(dirname "$(php bin/cdp-browser path "$binary")")"
+            rm -rf "$tree" "$(dirname "$tree")/.sha256-pair"
+            printf x >> "$tree.zip"
+            status=0
+            php bin/cdp-browser install 2> "$RUNNER_TEMP/refused.txt" || status=$?
+            cat "$RUNNER_TEMP/refused.txt"
+            # The exit code of a ChecksumException.
+            test "$status" -eq 65
+            grep -q "The archive is deleted and was not unpacked." "$RUNNER_TEMP/refused.txt"
+            test ! -e "$tree.zip"
+            test ! -e "$tree"
+          done

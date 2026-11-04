@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use SorgeIt\CdpBrowserInstaller\Binary;
 use SorgeIt\CdpBrowserInstaller\CommandLine;
 use SorgeIt\CdpBrowserInstaller\Download;
 use SorgeIt\CdpBrowserInstaller\Installer;
@@ -15,16 +16,18 @@ beforeEach(function (): void {
     $this->tools = new FakeTools($this->directory.'/tools');
 });
 
-it('downloads an archive from the source of Chrome for Testing', function (): void {
-    $archive = browserArchive($this->directory.'/source.zip', Platform::MacX64);
-    $this->tools->serve('155.0.8059.39', Platform::MacX64, $archive);
+it('downloads an archive from the source of Chrome for Testing', function (Binary $binary, string $url): void {
+    $archive = binaryArchive($this->directory.'/source.zip', $binary, Platform::MacX64);
+    $this->tools->serve('155.0.8059.39', $binary, Platform::MacX64, $archive);
 
-    new Download($this->tools->commandLine())->to('155.0.8059.39', Platform::MacX64, $this->directory.'/out.zip');
+    new Download($this->tools->commandLine())->to('155.0.8059.39', $binary, Platform::MacX64, $this->directory.'/out.zip');
 
     expect(file_get_contents($this->directory.'/out.zip'))->toBe(file_get_contents($archive))
-        ->and(Download::url('155.0.8059.39', Platform::MacX64))
-        ->toBe('https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.39/mac-x64/chrome-headless-shell-mac-x64.zip');
-});
+        ->and(Download::url('155.0.8059.39', $binary, Platform::MacX64))->toBe($url);
+})->with([
+    [Binary::ChromeHeadlessShell, 'https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.39/mac-x64/chrome-headless-shell-mac-x64.zip'],
+    [Binary::Chromedriver, 'https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.39/mac-x64/chromedriver-mac-x64.zip'],
+]);
 
 it('reports the command, its exit code and its error output', function (): void {
     expect(fn (): string => (new CommandLine)->run(['ls', $this->directory.'/missing']))
@@ -62,7 +65,7 @@ it('removes with rm -rf --, so that no path reads as an option', function (): vo
 it('leaves no file after an answer other than 200, or after curl stopped with part of it', function (string $curl, Closure $exception): void {
     $this->tools->add('curl', '$output = $argv[array_search("--output", $argv, true) + 1]; file_put_contents($output, "part"); '.$curl);
 
-    expect(fn () => new Download($this->tools->commandLine())->to('155.0.8059.39', Platform::LinuxX64, $this->directory.'/out.zip'))
+    expect(fn () => new Download($this->tools->commandLine())->to('155.0.8059.39', Binary::ChromeHeadlessShell, Platform::LinuxX64, $this->directory.'/out.zip'))
         ->toThrow($exception)
         ->and(file_exists($this->directory.'/out.zip'))->toBeFalse();
 })->with([
@@ -127,12 +130,16 @@ it('gives each process the environment of PHP, its own variables, and its timeou
 
 it('reads no option of unzip or zipinfo from the environment', function (string $variable, string $value): void {
     $archive = browserArchive($this->directory.'/source.zip', Platform::LinuxX64);
-    $this->tools->serve('155.0.8059.39', Platform::LinuxX64, $archive);
+    $chromedriver = chromedriverArchive($this->directory.'/chromedriver.zip', Platform::LinuxX64);
+    $this->tools->serve('155.0.8059.39', Binary::ChromeHeadlessShell, Platform::LinuxX64, $archive);
+    $this->tools->serve('155.0.8059.39', Binary::Chromedriver, Platform::LinuxX64, $chromedriver);
+
     $commandLine = $this->tools->commandLine(environment: [$variable => $value]);
 
-    $binary = new Installer($commandLine, $this->directory.'/cache', musl: false)->install(pinFor('155.0.8059.39', $archive), Platform::LinuxX64);
+    $binaries = new Installer($commandLine, $this->directory.'/cache', musl: false)->install(pinFor('155.0.8059.39', $archive, $chromedriver, Platform::LinuxX64), Platform::LinuxX64);
 
-    expect(is_file($binary))->toBeTrue();
+    expect(is_file($binaries->path(Binary::ChromeHeadlessShell)))->toBeTrue()
+        ->and(is_file($binaries->path(Binary::Chromedriver)))->toBeTrue();
 })->with([
     // `-l` makes unzip list instead of unpack, so the browser would be missing.
     ['UNZIP', '-l'],
@@ -145,7 +152,7 @@ it('reads no option of unzip or zipinfo from the environment', function (string 
 it('reports a timeout of curl as an error of the download, and leaves no file', function (): void {
     $this->tools->add('curl', 'sleep(5);');
 
-    expect(fn () => new Download($this->tools->commandLine(timeout: 1))->to('155.0.8059.39', Platform::LinuxX64, $this->directory.'/out.zip'))
+    expect(fn () => new Download($this->tools->commandLine(timeout: 1))->to('155.0.8059.39', Binary::Chromedriver, Platform::LinuxX64, $this->directory.'/out.zip'))
         ->toThrow(downloadException('`curl` stopped: The process', ProcessTimedOutException::class))
         ->and(file_exists($this->directory.'/out.zip'))->toBeFalse();
 });

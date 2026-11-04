@@ -9,7 +9,7 @@ use SorgeIt\SafeUnzip\ZipArchive;
 
 /**
  * Unpacks an archive of Chrome for Testing through safe-unzip. `install` and `pin` take an
- * archive only if it holds the binary of its platform.
+ * archive only if it holds its binary for its platform.
  *
  * @internal
  */
@@ -20,7 +20,7 @@ final readonly class Unpack
     /**
      * Writes the tree of the archive into the directory, or throws.
      */
-    public function to(string $archive, Platform $platform, string $directory): void
+    public function to(string $archive, Binary $binary, Platform $platform, string $directory): void
     {
         try {
             $zip = new ZipArchive(environment: $this->commandLine->environment(), timeout: $this->commandLine->timeout());
@@ -32,8 +32,8 @@ final readonly class Unpack
             throw new InstallerException($unzipException->getMessage(), $unzipException);
         }
 
-        if (! is_file($directory.'/'.$platform->binary())) {
-            throw new InstallerException(sprintf('The archive %s does not contain %s.', $archive, $platform->binary()));
+        if (! is_file($directory.'/'.$binary->path($platform))) {
+            throw new InstallerException(sprintf('The archive %s does not contain %s.', $archive, $binary->path($platform)));
         }
     }
 }

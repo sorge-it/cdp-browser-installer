@@ -1,11 +1,13 @@
 {
     "name": "sorge-it/cdp-browser-installer-works-with",
-    "description": "The project of the CI job works-with: each tool that the README names drives the browser that this checkout installs.",
+    "description": "The project of the CI job works-with: each tool that the README names drives the pair that this checkout installs.",
     "license": "MIT",
     "require": {
         "chrome-php/chrome": "*",
         "dmore/chrome-mink-driver": "*",
-        "sorge-it/cdp-browser-installer": "*@dev"
+        "php-webdriver/webdriver": "*",
+        "sorge-it/cdp-browser-installer": "*@dev",
+        "symfony/panther": "*"
     },
     "repositories": [
         {

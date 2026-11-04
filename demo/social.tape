@@ -14,7 +14,7 @@ Type "export PS1='$ ' && php social.php && sleep 120"
 Enter
 # The download took 92 to 98 s on 2026-10-31 under load; wait for the last line, not for a fixed
 # time. A failed social.php prints no last line, and VHS stops after 300 s.
-Wait+Screen@300s /no ext-zip/
+Wait+Screen@300s /chrome-mink-driver\./
 Show
 Sleep 500ms
 

@@ -1,9 +1,9 @@
 {
     "name": "sorge-it/cdp-browser-installer",
-    "description": "Installs a pinned, SHA-256-checked chrome-headless-shell from Chrome for Testing as a Composer dev dependency: the same headless Chrome for every developer and CI run, without Node. Built for agentic engineering.",
+    "description": "Installs chrome-headless-shell and the chromedriver of the same version from Chrome for Testing, pinned and SHA-256-checked, as a Composer dev dependency for Laravel Dusk, Symfony Panther, php-webdriver and chrome-php, without Node.",
     "type": "library",
     "license": "MIT",
-    "keywords": ["ai-agents", "coding-agents", "agentic-engineering", "security", "supply-chain-security", "sha256", "installer", "github-actions", "testing", "browser-testing", "e2e-testing", "pest", "phpunit", "chrome-for-testing", "chrome-headless-shell", "headless-chrome", "headless-browser", "chromium", "cdp", "chrome-devtools-protocol"],
+    "keywords": ["ai-agents", "coding-agents", "agentic-engineering", "supply-chain-security", "sha256", "installer", "github-actions", "browser-testing", "e2e-testing", "pest", "phpunit", "chrome-for-testing", "chrome-headless-shell", "chromedriver", "webdriver", "php-webdriver", "dusk", "laravel-dusk", "panther", "symfony-panther", "headless-chrome", "headless-browser", "chromium", "cdp", "chrome-devtools-protocol"],
     "homepage": "https://github.com/sorge-it/cdp-browser-installer",
     "authors": [
         {
@@ -54,7 +54,7 @@
             "@test:unit"
         ],
         "test:unit": "pest",
-        "test:types": "phpstan",
+        "test:types": "phpstan --memory-limit=160M",
         "test:type-coverage": "@php -d memory_limit=1G vendor/bin/pest --type-coverage --min=100 --no-cache",
         "test:coverage": "@php -d memory_limit=1G vendor/bin/pest --coverage --min=100",
         "test:lint": [

@@ -2,20 +2,29 @@
 
 declare(strict_types=1);
 
+use SorgeIt\CdpBrowserInstaller\Binary;
 use SorgeIt\CdpBrowserInstaller\InstallerException;
 use SorgeIt\CdpBrowserInstaller\Pin;
 use SorgeIt\CdpBrowserInstaller\Platform;
 
 /**
- * @return array<string, string>
+ * @return array<string, array<string, string>>
  */
 function hashes(): array
 {
     return [
-        'linux64' => str_repeat('a', 64),
-        'linux-arm64' => str_repeat('b', 64),
-        'mac-x64' => str_repeat('c', 64),
-        'mac-arm64' => str_repeat('d', 64),
+        'chrome-headless-shell' => [
+            'linux64' => str_repeat('a', 64),
+            'linux-arm64' => str_repeat('b', 64),
+            'mac-x64' => str_repeat('c', 64),
+            'mac-arm64' => str_repeat('d', 64),
+        ],
+        'chromedriver' => [
+            'linux64' => str_repeat('e', 64),
+            'linux-arm64' => str_repeat('f', 64),
+            'mac-x64' => str_repeat('0', 64),
+            'mac-arm64' => str_repeat('1', 64),
+        ],
     ];
 }
 
@@ -26,15 +35,21 @@ it('reads what it writes', function (): void {
     $pin = Pin::read($file);
 
     expect($pin->version)->toBe('155.0.8059.39')
-        ->and($pin->hash(Platform::MacX64))->toBe(str_repeat('c', 64))
-        ->and(json_decode((string) file_get_contents($file), true))->toBe(['version' => '155.0.8059.39', 'sha256' => hashes()]);
+        ->and($pin->hash(Binary::ChromeHeadlessShell, Platform::MacX64))->toBe(str_repeat('c', 64))
+        ->and($pin->hash(Binary::Chromedriver, Platform::MacX64))->toBe(str_repeat('0', 64))
+        ->and(json_decode((string) file_get_contents($file), true))->toBe(['version' => '155.0.8059.39'] + hashes());
 });
 
-it('needs a valid SHA-256 for every platform', function (?string $hash): void {
-    $hashes = $hash === null ? array_diff_key(hashes(), ['mac-arm64' => true]) : ['mac-arm64' => $hash] + hashes();
+it('needs a valid SHA-256 of each binary for every platform', function (?string $hash): void {
+    $hashes = hashes();
+    unset($hashes['chromedriver']['mac-arm64']);
+
+    if ($hash !== null) {
+        $hashes['chromedriver']['mac-arm64'] = $hash;
+    }
 
     expect(fn (): Pin => new Pin('155.0.8059.39', $hashes))
-        ->toThrow(installerException('The pin of 155.0.8059.39 has no valid SHA-256 for mac-arm64.'));
+        ->toThrow(installerException('The pin of 155.0.8059.39 has no valid SHA-256 of chromedriver for mac-arm64.'));
 })->with([
     'missing' => [null],
     'too short' => ['abc'],
@@ -65,12 +80,31 @@ it('stops at a file that is no pin', function (string $content, string $message)
 })->with([
     ['{', 'is not valid JSON'],
     // A pin nests two levels deep; the parser stops at the third.
-    ['{"version": "155.0.8059.39", "sha256": {"linux64": ["a"]}}', 'is not valid JSON: Maximum stack depth exceeded.'],
-    ['{"version": "155.0.8059.39"}', 'needs `version` and `sha256`'],
-    ['{"sha256": {}}', 'needs `version` and `sha256`'],
+    ['{"version": "155.0.8059.39", "chromedriver": {"linux64": ["a"]}}', 'is not valid JSON: Maximum stack depth exceeded.'],
+    ['{"version": "155.0.8059.39"}', 'needs `version`, `chrome-headless-shell` and `chromedriver`'],
+    ['{"version": "155.0.8059.39", "chrome-headless-shell": {}}', 'needs `version`, `chrome-headless-shell` and `chromedriver`'],
+    ['{"version": "155.0.8059.39", "chrome-headless-shell": {}, "chromedriver": "a"}', 'needs `version`, `chrome-headless-shell` and `chromedriver`'],
+    ['{"chrome-headless-shell": {}, "chromedriver": {}}', 'needs `version`, `chrome-headless-shell` and `chromedriver`'],
     // A hash that is no text counts as missing.
-    [sprintf('{"version": "155.0.8059.39", "sha256": %s}', json_encode(['linux64' => 1] + hashes())), 'The pin of 155.0.8059.39 has no valid SHA-256 for linux64.'],
+    [json_encode(['version' => '155.0.8059.39', 'chrome-headless-shell' => ['linux64' => 1] + hashes()['chrome-headless-shell'], 'chromedriver' => hashes()['chromedriver']]), 'The pin of 155.0.8059.39 has no valid SHA-256 of chrome-headless-shell for linux64.'],
 ]);
+
+it('names the command that writes a pin of version 1 again', function (): void {
+    $file = temporaryDirectory().'/.chrome-version';
+    file_put_contents($file, json_encode(['version' => '155.0.8059.39', 'sha256' => hashes()['chrome-headless-shell']]));
+
+    expect(fn (): Pin => Pin::read($file))->toThrow(installerException(sprintf(
+        'The pin file %s pins chrome-headless-shell only, in the form of version 1. Write it again with `cdp-browser pin 155.0.8059.39`: it pins chrome-headless-shell and chromedriver.',
+        $file,
+    )));
+});
+
+it('checks the version of a pin of version 1 before its message names it', function (): void {
+    $file = temporaryDirectory().'/.chrome-version';
+    file_put_contents($file, json_encode(['version' => "155.0.8059.39\e[2J", 'sha256' => hashes()['chrome-headless-shell']]));
+
+    expect(fn (): Pin => Pin::read($file))->toThrow(installerException('is not a Chrome for Testing version'));
+});
 
 it('writes the pin as JSON on several lines, with a line break at the end', function (): void {
     $file = temporaryDirectory().'/.chrome-version';
@@ -78,11 +112,8 @@ it('writes the pin as JSON on several lines, with a line break at the end', func
     new Pin('155.0.8059.39', hashes())->write($file);
 
     expect(file_get_contents($file))->toBe(sprintf(
-        "{\n    \"version\": \"155.0.8059.39\",\n    \"sha256\": {\n        \"linux64\": \"%s\",\n        \"linux-arm64\": \"%s\",\n        \"mac-x64\": \"%s\",\n        \"mac-arm64\": \"%s\"\n    }\n}\n",
-        str_repeat('a', 64),
-        str_repeat('b', 64),
-        str_repeat('c', 64),
-        str_repeat('d', 64),
+        "{\n    \"version\": \"155.0.8059.39\",\n    \"chrome-headless-shell\": {\n        \"linux64\": \"%s\",\n        \"linux-arm64\": \"%s\",\n        \"mac-x64\": \"%s\",\n        \"mac-arm64\": \"%s\"\n    },\n    \"chromedriver\": {\n        \"linux64\": \"%s\",\n        \"linux-arm64\": \"%s\",\n        \"mac-x64\": \"%s\",\n        \"mac-arm64\": \"%s\"\n    }\n}\n",
+        ...array_merge(...array_values(array_map(array_values(...), hashes()))),
     ));
 });
 
@@ -95,7 +126,7 @@ it('keeps the whole old pin file when the write of the new one fails', function 
     $code = sprintf(
         'pcntl_signal(SIGXFSZ, SIG_IGN); posix_setrlimit(POSIX_RLIMIT_FSIZE, 0, POSIX_RLIMIT_INFINITY); try { @new %s("156.0.0.1", %s)->write(%s); } catch (%s $exception) { echo $exception->getMessage(); } posix_setrlimit(POSIX_RLIMIT_FSIZE, POSIX_RLIMIT_INFINITY, POSIX_RLIMIT_INFINITY);',
         Pin::class,
-        var_export(array_map(static fn (string $hash): string => strtr($hash, 'abcd', 'efef'), hashes()), true),
+        var_export(array_map(static fn (array $hashes): array => array_map(static fn (string $hash): string => strtr($hash, 'abcd', 'efef'), $hashes), hashes()), true),
         var_export($file, true),
         InstallerException::class,
     );

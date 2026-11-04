@@ -12,12 +12,12 @@ use DMore\ChromeDriver\ChromeDriver;
 require __DIR__.'/vendor/autoload.php';
 require __DIR__.'/check.php';
 
-// As the command line of the README: the path from `cdp-browser path`.
-exec('vendor/bin/cdp-browser path', $output, $code);
+// As the command line of the README: the path from `cdp-browser path chrome-headless-shell`.
+exec('vendor/bin/cdp-browser path chrome-headless-shell', $output, $code);
 $binary = $output[0] ?? '';
 
 if ($code !== 0 || $binary === '') {
-    fwrite(STDERR, "`vendor/bin/cdp-browser path` named no browser.\n");
+    fwrite(STDERR, "`vendor/bin/cdp-browser path chrome-headless-shell` named no browser.\n");
 
     exit(1);
 }
