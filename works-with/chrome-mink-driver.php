@@ -23,6 +23,7 @@ if ($code !== 0 || $binary === '') {
 }
 
 $profile = sys_get_temp_dir().'/works-with-'.getmypid();
+$log = $profile.'.log';
 $arguments = [$binary, '--headless', '--remote-debugging-port=9222', '--user-data-dir='.$profile];
 
 // Ubuntu 24.04 blocks the user namespaces of the Chrome sandbox through AppArmor.
@@ -30,14 +31,14 @@ if (PHP_OS_FAMILY === 'Linux') {
     $arguments[] = '--no-sandbox';
 }
 
-// The error output of the browser stays in the log of the job.
-$process = proc_open($arguments, [1 => ['file', '/dev/null', 'w']], $pipes);
+$process = proc_open($arguments, [1 => ['file', '/dev/null', 'w'], 2 => ['file', $log, 'w']], $pipes);
 
 try {
     $deadline = microtime(true) + 20;
 
-    // The browser writes the port and the path of its WebSocket into this file once it listens.
-    while (! is_file($profile.'/DevToolsActivePort')) {
+    // Alpine's Chromium writes no `DevToolsActivePort`. Each browser names its WebSocket in its
+    // error output once it listens.
+    while (preg_match('~^DevTools listening on (ws://\S+)\n~m', (string) file_get_contents($log), $listening) !== 1) {
         if (! proc_get_status($process)['running'] || microtime(true) >= $deadline) {
             throw new RuntimeException('The browser did not listen on a debugging port within 20 seconds.');
         }
@@ -45,16 +46,14 @@ try {
         usleep(100_000);
     }
 
-    // Where another process holds 127.0.0.1:9222, the browser listens on [::1]:9222 and still
-    // writes 9222; the driver would then talk to the other process.
-    [$port, $socket] = explode("\n", (string) file_get_contents($profile.'/DevToolsActivePort')) + ['', ''];
+    // Where another process listens on 127.0.0.1:9222, the browser listens on [::1]:9222, and the
+    // driver would talk to the other process.
     $curl = curl_init('http://127.0.0.1:9222/json/version');
     curl_setopt_array($curl, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 5]);
     $version = json_decode((string) curl_exec($curl), true);
-    $served = is_array($version) && is_string($version['webSocketDebuggerUrl'] ?? null) ? (string) parse_url($version['webSocketDebuggerUrl'], PHP_URL_PATH) : '';
 
-    if ($port !== '9222' || $served !== $socket) {
-        throw new RuntimeException(sprintf('Another process answers on 127.0.0.1:9222; the browser of this script listens on port %s at %s.', $port, $socket));
+    if (! is_array($version) || ($version['webSocketDebuggerUrl'] ?? null) !== $listening[1] || ! is_string($version['Browser'] ?? null)) {
+        throw new RuntimeException(sprintf('Another process answers on 127.0.0.1:9222; the browser of this script listens at %s.', $listening[1]));
     }
 
     // README: begin
@@ -65,14 +64,18 @@ try {
     try {
         $session->visit('data:text/html,<p id="ok">chrome-mink-driver</p>');
         $text = $session->getPage()->find('css', '#ok')?->getText();
-        $agent = (string) $session->evaluateScript('return navigator.userAgent');
     } finally {
         $session->stop();
     }
 } finally {
     proc_terminate($process);
     proc_close($process);
-    exec('rm -rf '.escapeshellarg($profile));
+    // The error output of the browser stays in the log of the job.
+    fwrite(STDERR, (string) file_get_contents($log));
+    exec('rm -rf '.escapeshellarg($profile).' '.escapeshellarg($log));
 }
 
-check('dmore/chrome-mink-driver', $text, 'chrome-mink-driver', $agent);
+// Such as "HeadlessChrome/157.0.8103.38" or "Chrome/156.0.8078.79".
+$product = (string) $version['Browser'];
+
+check('dmore/chrome-mink-driver', $text, 'chrome-mink-driver', substr($product, strpos($product, '/') + 1));

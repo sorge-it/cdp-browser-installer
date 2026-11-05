@@ -7,6 +7,7 @@ declare(strict_types=1);
 // lines between the README markers stand word for word in the README; a test compares them.
 
 use HeadlessChromium\BrowserFactory;
+use HeadlessChromium\Communication\Message;
 use SorgeIt\CdpBrowserInstaller\Binary;
 use SorgeIt\CdpBrowserInstaller\Installer;
 use SorgeIt\CdpBrowserInstaller\Pin;
@@ -24,9 +25,10 @@ try {
     $page = $browser->createPage();
     $page->navigate('data:text/html,<p id="ok">chrome-php</p>')->waitForNavigation();
     $text = $page->evaluate('document.getElementById("ok")?.textContent ?? null')->getReturnValue();
-    $agent = (string) $page->evaluate('navigator.userAgent')->getReturnValue();
+    // Such as "HeadlessChrome/157.0.8103.38".
+    $product = (string) $browser->getConnection()->sendMessageSync(new Message('Browser.getVersion'))->getResultData('product');
 } finally {
     $browser->close();
 }
 
-check('chrome-php/chrome', is_string($text) ? $text : null, 'chrome-php', $agent);
+check('chrome-php/chrome', is_string($text) ? $text : null, 'chrome-php', substr($product, strpos($product, '/') + 1));

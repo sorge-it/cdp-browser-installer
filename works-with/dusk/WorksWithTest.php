@@ -14,13 +14,13 @@ require dirname(__DIR__).'/check.php';
 
 final class WorksWithTest extends DuskTestCase
 {
-    public function test_dusk_reads_the_page_through_the_pinned_pair(): void
+    public function test_dusk_reads_the_page_through_the_pair(): void
     {
         $this->browse(static function (Browser $browser): void {
             $browser->visit('/works-with.html')->assertSeeIn('#ok', 'laravel/dusk');
-            $chrome = $browser->driver->getCapabilities()->getCapability('chrome');
+            $capabilities = $browser->driver->getCapabilities();
 
-            check('laravel/dusk', $browser->text('#ok'), 'laravel/dusk', (string) $browser->script('return navigator.userAgent')[0], (string) ($chrome['chromedriverVersion'] ?? ''));
+            check('laravel/dusk', $browser->text('#ok'), 'laravel/dusk', (string) $capabilities->getCapability('browserVersion'), (string) ($capabilities->getCapability('chrome')['chromedriverVersion'] ?? ''));
         });
     }
 }

@@ -28,7 +28,9 @@ concurrency:
 
 # Kept by hand, as in tests.yml.
 env:
+  COMPOSER_IMAGE: composer:2.10.3@sha256:2cf275428757e5435a667bfc0d038b14520ca02be2b1b70d44a05c8c19e2de48
   SETUP_PHP_COMPOSER: composer:2.10.3@sha256:7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6
+  ALPINE_IMAGE: php:8.5.12-cli-alpine@sha256:e899a75c775804e5466dbd9c96b31f8b6c6ae2ddb053a8466223a0c32992ff8e
 
 jobs:
   # Each tool under "Works with" in the README, at its newest release, drives the browser of
@@ -131,5 +133,108 @@ jobs:
           trap 'kill $!' EXIT
           curl --silent --show-error --fail --retry 20 --retry-connrefused --retry-delay 1 --output /dev/null "$APP_URL/works-with.html"
           php artisan dusk
+          # A run without a Dusk test also ends with exit code 0. check.php adds the row of the tool.
+          grep -q "^| \`laravel/dusk\` |" "$GITHUB_STEP_SUMMARY" || { echo '::error::No Dusk test ran: the summary has no row for laravel/dusk.'; exit 1; }
+
+  # Each tool on Alpine, where Chrome for Testing does not start: `deps` installs Alpine's chromium
+  # and chromium-chromedriver, and the two variables name them. The steps run in one container as
+  # a user with the uid of the runner, so the checkout and the summary stay writable.
+  works-with-alpine:
+    name: Works with · Alpine · ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+
+    defaults:
+      run:
+        working-directory: works-with
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # chrome-php/chrome needs ext-sockets, php-webdriver/webdriver ext-zip.
+      - name: Start the container
+        run: |
+          docker run --rm --entrypoint cat "$COMPOSER_IMAGE" /usr/bin/composer > "$RUNNER_TEMP/composer"
+          chmod 755 "$RUNNER_TEMP/composer"
+          docker run --rm --detach --init --shm-size=1g --name alpine \
+            --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" --volume "$RUNNER_TEMP:$RUNNER_TEMP" \
+            --volume "$RUNNER_TEMP/composer:/usr/local/bin/composer:ro" \
+            --workdir "$PWD" --env GITHUB_WORKSPACE --env RUNNER_TEMP \
+            --env CDP_BROWSER_CHROME=/usr/bin/chromium --env CDP_BROWSER_CHROMEDRIVER=/usr/bin/chromedriver \
+            --entrypoint sleep "$ALPINE_IMAGE" infinity
+          docker exec alpine sh -euc '
+            apk add --no-cache unzip libzip-dev $PHPIZE_DEPS linux-headers > /dev/null
+            docker-php-ext-install sockets zip > /dev/null
+          '
+          docker exec alpine adduser -D -u "$(id -u)" tester
+
+      - name: Install this checkout and the tools
+        run: |
+          docker exec --user tester alpine sh -euc '
+            composer update --no-interaction --prefer-dist
+            composer show --direct
+            composer outdated --direct --strict
+          '
+
+      - name: Audit the dependencies
+        run: docker exec --user tester alpine composer audit
+
+      - name: Install the system libraries and Alpine's pair
+        run: docker exec alpine php vendor/bin/cdp-browser deps
+
+      - name: Use Alpine's pair
+        run: docker exec --user tester alpine php vendor/bin/cdp-browser install
+
+      - name: Start the summary
+        run: |
+          {
+            echo '| Tool | Version | Browser | ChromeDriver | Platform |'
+            echo '|---|---|---|---|---|'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: chrome-php/chrome
+        run: docker exec --user tester --env GITHUB_STEP_SUMMARY alpine php chrome-php.php
+
+      - name: dmore/chrome-mink-driver
+        run: docker exec --user tester --env GITHUB_STEP_SUMMARY alpine php chrome-mink-driver.php
+
+      - name: php-webdriver/webdriver
+        run: docker exec --user tester --env GITHUB_STEP_SUMMARY alpine php php-webdriver.php
+
+      - name: symfony/panther
+        run: docker exec --user tester --env GITHUB_STEP_SUMMARY alpine php panther.php
+
+      - name: Create a Laravel app for laravel/dusk
+        run: |
+          docker exec --user tester alpine sh -euc '
+            app="$RUNNER_TEMP/laravel"
+            composer create-project --no-interaction --prefer-dist laravel/laravel "$app"
+            mkdir -p "$app/tests/Browser/console" "$app/tests/Browser/screenshots" "$app/tests/Browser/source"
+            cp dusk/DuskTestCase.php check.php "$app/tests/"
+            cp dusk/WorksWithTest.php "$app/tests/Browser/"
+            cp dusk/works-with.html "$app/public/"
+            cd "$app"
+            composer config repositories.installer path "$GITHUB_WORKSPACE"
+            composer require --dev --no-interaction laravel/dusk "sorge-it/cdp-browser-installer:*@dev"
+            composer audit
+            composer outdated --strict laravel/dusk
+          '
+
+      - name: laravel/dusk
+        run: |
+          docker exec --user tester --env GITHUB_STEP_SUMMARY --env APP_URL=http://127.0.0.1:8000 --workdir "$RUNNER_TEMP/laravel" alpine sh -euc '
+            php artisan serve --no-reload > /dev/null 2>&1 &
+            trap "kill $!" EXIT
+            curl --silent --show-error --fail --retry 20 --retry-connrefused --retry-delay 1 --output /dev/null "$APP_URL/works-with.html"
+            php artisan dusk
+          '
           # A run without a Dusk test also ends with exit code 0. check.php adds the row of the tool.
           grep -q "^| \`laravel/dusk\` |" "$GITHUB_STEP_SUMMARY" || { echo '::error::No Dusk test ran: the summary has no row for laravel/dusk.'; exit 1; }
