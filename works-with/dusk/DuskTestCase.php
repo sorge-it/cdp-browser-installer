@@ -31,7 +31,7 @@ abstract class DuskTestCase extends BaseTestCase
     protected function driver(): RemoteWebDriver
     {
         $options = new ChromeOptions()->setBinary(self::binaries()->path(Binary::ChromeHeadlessShell));
-        $options->addArguments(PHP_OS_FAMILY === 'Linux' ? ['--no-sandbox'] : []);
+        $options->addArguments(PHP_OS_FAMILY === 'Linux' ? ['--headless', '--no-sandbox'] : ['--headless']);
 
         return RemoteWebDriver::create('http://localhost:9515', DesiredCapabilities::chrome()->setCapability(ChromeOptions::CAPABILITY, $options));
     }

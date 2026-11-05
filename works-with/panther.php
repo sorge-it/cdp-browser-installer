@@ -25,10 +25,11 @@ $client = Client::createChromeClient($binaries->path(Binary::Chromedriver));
 try {
     $client->request('GET', 'data:text/html,<p id="ok">panther</p>');
     $text = $client->getCrawler()->filter('#ok')->text();
-    $agent = (string) $client->executeScript('return navigator.userAgent');
-    $chromedriver = (string) ($client->getWebDriver()->getCapabilities()->getCapability('chrome')['chromedriverVersion'] ?? '');
+    $capabilities = $client->getWebDriver()->getCapabilities();
+    $browser = (string) $capabilities->getCapability('browserVersion');
+    $chromedriver = (string) ($capabilities->getCapability('chrome')['chromedriverVersion'] ?? '');
 } finally {
     $client->quit();
 }
 
-check('symfony/panther', $text, 'panther', $agent, $chromedriver);
+check('symfony/panther', $text, 'panther', $browser, $chromedriver);

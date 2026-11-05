@@ -64,7 +64,8 @@ vendor/bin/cdp-browser path chromedriver               # prints the path of Chro
 
 Give the paths to your test tool: a WebDriver tool needs both, a CDP tool only the browser.
 [Works with](#works-with) shows five tools, and a CI job runs each of them with the pair of the pin
-file. The package contains no Pest or PHPUnit plugin, and it starts neither binary for a test.
+file, and on Alpine with Alpine's pair. The package contains no Pest or PHPUnit plugin, and it
+starts neither binary for a test.
 
 **Trust.** [Security](#security) lists seven rules, each with the code that implements it.
 [Limits of the security model](#limits-of-the-security-model) lists what the installer does not
@@ -87,9 +88,12 @@ Run `vendor/bin/cdp-browser install` before the examples.
 A WebDriver tool needs no ChromeDriver of its own, such as the one that
 `php artisan dusk:chrome-driver` or `vendor/bin/bdi detect drivers` installs. On Linux, each
 example turns off the sandbox in its code or names `--no-sandbox` in its text, as the job does (see
-[Run the browser and ChromeDriver](#run-the-browser-and-chromedriver)). `chrome-headless-shell`
-has no window, so `DUSK_HEADLESS_DISABLED` and `PANTHER_NO_HEADLESS` do not open one; for a
-window, use a Chrome of the system and a ChromeDriver of its version.
+[Run the browser and ChromeDriver](#run-the-browser-and-chromedriver)). The examples for
+`laravel/dusk` and `php-webdriver/webdriver` pass `--headless`: `chrome-headless-shell` accepts it,
+and the full Chromium of [Alpine](#alpine-and-other-musl-systems) needs it. Panther passes it
+itself. `chrome-headless-shell` has no window, so `DUSK_HEADLESS_DISABLED` and
+`PANTHER_NO_HEADLESS` do not open one. For a window, use a Chrome of the system and a ChromeDriver
+of its version, and remove `--headless`.
 
 ### laravel/dusk
 
@@ -130,7 +134,7 @@ abstract class DuskTestCase extends BaseTestCase
     protected function driver(): RemoteWebDriver
     {
         $options = new ChromeOptions()->setBinary(self::binaries()->path(Binary::ChromeHeadlessShell));
-        $options->addArguments(PHP_OS_FAMILY === 'Linux' ? ['--no-sandbox'] : []);
+        $options->addArguments(PHP_OS_FAMILY === 'Linux' ? ['--headless', '--no-sandbox'] : ['--headless']);
 
         return RemoteWebDriver::create('http://localhost:9515', DesiredCapabilities::chrome()->setCapability(ChromeOptions::CAPABILITY, $options));
     }
@@ -193,7 +197,7 @@ use SorgeIt\CdpBrowserInstaller\Platform;
 
 $binaries = Installer::fromEnvironment(getenv())->binaries(Pin::FILE, Platform::current());
 $options = new ChromeOptions()->setBinary($binaries->path(Binary::ChromeHeadlessShell));
-$options->addArguments(PHP_OS_FAMILY === 'Linux' ? ['--no-sandbox'] : []);
+$options->addArguments(PHP_OS_FAMILY === 'Linux' ? ['--headless', '--no-sandbox'] : ['--headless']);
 $capabilities = DesiredCapabilities::chrome()->setCapability(ChromeOptions::CAPABILITY, $options);
 $service = new ChromeDriverService($binaries->path(Binary::Chromedriver), 9515, ['--port=9515']);
 $driver = ChromeDriver::start($capabilities, $service);
@@ -234,10 +238,10 @@ try {
 [`dmore/chrome-mink-driver`](https://packagist.org/packages/dmore/chrome-mink-driver) connects to
 a browser that already runs; `dmore/behat-chrome-extension` uses this driver. The driver needs
 `ext-curl` and `ext-mbstring`. Start the browser with a debugging port and a profile directory.
-On Linux, add `--no-sandbox`. The browser writes the port to `DevToolsActivePort` in the profile
-once it listens; wait for that file before the driver connects. Remove `.chrome-profile` before
-each run: an old `DevToolsActivePort` in it names the port of an earlier browser. Stop the browser
-after the tests.
+On Linux, add `--no-sandbox`. Before the driver connects, wait until
+`http://127.0.0.1:9222/json/version` answers. If another process listens on port 9222 before the
+start, the browser listens on `[::1]:9222`, and the driver talks to the other process. Stop the
+browser after the tests.
 
 ```sh
 "$(vendor/bin/cdp-browser path chrome-headless-shell)" --headless --remote-debugging-port=9222 --user-data-dir="$PWD/.chrome-profile" &
@@ -260,12 +264,15 @@ try {
 ### The CI job `works-with`
 
 The CI job [`works-with`](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/works-with.yml)
-runs each tool in this section with the pair of the pin file of this repository. It installs the
-newest release of each tool, loads a page through it and reads the text of one element. It also
-checks that the browser, and for a WebDriver tool also ChromeDriver, reports the pinned version.
-For Laravel Dusk, `php artisan serve` serves the page from a new Laravel app. The job runs with
-PHP 8.5 on Linux x64, Linux arm64 and macOS arm64. It runs each Monday, on demand, after each
-merge, and on each pull request that changes the pin file, the installer or the job.
+runs each tool in this section with PHP 8.5. On Linux x64, Linux arm64 and macOS arm64, it uses
+the pair of the pin file of this repository. On Alpine x64 and arm64, it uses Alpine's pair (see
+[Alpine](#alpine-and-other-musl-systems)), as a user that is not root. It installs the newest
+release of each tool, loads a page through it and reads the text of one element. It also checks
+that the browser, and for a WebDriver tool also ChromeDriver, reports the version of the pair: the
+version in the pin file, or on Alpine the version that `chromium --version` prints. For Laravel
+Dusk, `php artisan serve` serves the page from a new Laravel app. The job runs each Monday, on
+demand, after each merge, and on each pull request that changes the pin file, the installer or the
+job.
 
 Each tool has a step with its name, so the failed step names the tool. The job also fails when a
 tool is not at its newest release, when `composer audit` finds an advisory, when `deps` or
@@ -704,11 +711,11 @@ install Chromium and its ChromeDriver yourself and set both variables to their p
 The version of the pair is Alpine's, not the pin file's. On 2026-11-03, Alpine 3.24 shipped
 `chromium` and `chromium-chromedriver` 156.0.8078.79 from one build. `path chrome-headless-shell`
 prints the path in `CDP_BROWSER_CHROME`, such as `/usr/bin/chromium`. It is the full Chromium, so
-without a display, start it with `--headless`. In the examples for `php-webdriver/webdriver` and
-`laravel/dusk`, add `--headless` to the arguments of `ChromeOptions`. Without it, ChromeDriver
-stops with `session not created: Chrome instance exited`. Panther adds `--headless` itself. This
-was measured by hand on 2026-11-03 with `php-webdriver/webdriver` and `symfony/panther`; the job
-`works-with` does not run on Alpine. To check the browser:
+without a display, start it with `--headless`, as the examples under [Works with](#works-with) do.
+Without it, ChromeDriver stops with `session not created: Chrome instance exited`. The user agent
+of Alpine's Chromium names only the major version, such as `HeadlessChrome/156.0.0.0`. The job
+[`works-with`](#the-ci-job-works-with) runs each tool of that section with this pair. To check the
+browser:
 
 ```sh
 /usr/bin/chromium --headless --no-sandbox --dump-dom 'data:text/html,<p>ok</p>'

@@ -22,7 +22,7 @@ require __DIR__.'/check.php';
 // README: begin
 $binaries = Installer::fromEnvironment(getenv())->binaries(Pin::FILE, Platform::current());
 $options = new ChromeOptions()->setBinary($binaries->path(Binary::ChromeHeadlessShell));
-$options->addArguments(PHP_OS_FAMILY === 'Linux' ? ['--no-sandbox'] : []);
+$options->addArguments(PHP_OS_FAMILY === 'Linux' ? ['--headless', '--no-sandbox'] : ['--headless']);
 $capabilities = DesiredCapabilities::chrome()->setCapability(ChromeOptions::CAPABILITY, $options);
 $service = new ChromeDriverService($binaries->path(Binary::Chromedriver), 9515, ['--port=9515']);
 $driver = ChromeDriver::start($capabilities, $service);
@@ -31,10 +31,10 @@ $driver = ChromeDriver::start($capabilities, $service);
 try {
     $driver->get('data:text/html,<p id="ok">php-webdriver</p>');
     $text = $driver->findElement(WebDriverBy::id('ok'))->getText();
-    $agent = (string) $driver->executeScript('return navigator.userAgent');
+    $browser = (string) $driver->getCapabilities()->getCapability('browserVersion');
     $chromedriver = (string) ($driver->getCapabilities()->getCapability('chrome')['chromedriverVersion'] ?? '');
 } finally {
     $driver->quit();
 }
 
-check('php-webdriver/webdriver', $text, 'php-webdriver', $agent, $chromedriver);
+check('php-webdriver/webdriver', $text, 'php-webdriver', $browser, $chromedriver);
