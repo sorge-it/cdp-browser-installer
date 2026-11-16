@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-// The README shows under "Works with" what the CI job `works-with` runs. These tests keep the two
+// The README shows under "Works with" what the workflow `works-with` runs. These tests keep the two
 // equal: an example that the job does not run would be a claim without a proof.
 
 /**
@@ -50,8 +50,13 @@ it('shows each tool with the lines that its script runs, and frees the browser a
     $region = scriptRegion($script);
     preg_match_all('/^use [^;]+;$/m', $blocks[0] ?? '', $imports);
     $freed = '~\} finally \{\n\s*'.preg_quote($free, '~').'\n~';
+    // A complete file, run from the root of the project, as the script runs from works-with/.
+    $autoload = "\nrequire __DIR__.'/vendor/autoload.php';\n";
 
     expect($blocks)->toHaveCount(1)
+        ->and($blocks[0])->toStartWith("<?php\n\nuse ")
+        ->and($blocks[0])->toContain($autoload)
+        ->and($script)->toContain($autoload)
         ->and($region)->not()->toBe('')
         ->and($blocks[0])->toContain($region)
         ->and($imports[0])->not()->toBe([])
@@ -60,34 +65,44 @@ it('shows each tool with the lines that its script runs, and frees the browser a
         ->and(preg_match($freed, $script))->toBe(1);
 })->with([
     'chrome-php/chrome' => ['chrome-php/chrome', 'chrome-php.php', '$browser->close();'],
-    'dmore/chrome-mink-driver' => ['dmore/chrome-mink-driver', 'chrome-mink-driver.php', '$session->stop();'],
+    'dmore/chrome-mink-driver' => ['Mink (dmore/chrome-mink-driver)', 'chrome-mink-driver.php', '$session->stop();'],
     'php-webdriver/webdriver' => ['php-webdriver/webdriver', 'php-webdriver.php', '$driver->quit();'],
-    'symfony/panther' => ['symfony/panther', 'panther.php', '$client->quit();'],
+    'symfony/panther' => ['Symfony Panther (symfony/panther)', 'panther.php', '$client->quit();'],
 ]);
 
-it('shows the methods of DuskTestCase for laravel/dusk as the job writes them', function (): void {
-    $script = (string) file_get_contents(dirname(__DIR__, 2).'/works-with/dusk/DuskTestCase.php');
-    $blocks = readmeBlocks(readmeSection('laravel/dusk'), 'php');
+it('shows the base test class of each test tool with the methods that the job runs', function (string $tool, string $file, string $class): void {
+    $script = (string) file_get_contents(dirname(__DIR__, 2).'/works-with/'.$file);
+    $blocks = readmeBlocks(readmeSection($tool), 'php');
     // The methods stand in the class body, one level in.
     $methods = (string) preg_replace('/^(?=.)/m', '    ', scriptRegion($script));
     preg_match_all('/^use [^;]+;$/m', $blocks[0] ?? '', $imports);
+    preg_match('/^namespace [^;]+;$/m', $script, $namespace);
 
-    expect($blocks)->toHaveCount(1)
-        ->and($methods)->toContain('function prepare()')
-        ->and($blocks[0])->toContain("abstract class DuskTestCase extends BaseTestCase\n{\n".$methods."}\n")
+    expect($namespace)->toHaveCount(1)
+        ->and($blocks)->toHaveCount(1)
+        ->and($blocks[0])->toStartWith("<?php\n\n".($namespace[0] ?? '')."\n\nuse ")
+        ->and($methods)->toContain("    #[BeforeClass]\n")
+        ->and($script)->toContain($class."\n{\n")
+        ->and($blocks[0])->toContain($class."\n{\n".$methods."}\n")
         ->and(array_values(array_filter($imports[0], static fn (string $import): bool => ! str_contains($script, $import."\n"))))->toBe([])
         ->and($imports[0])->toHaveCount(substr_count($script, "\nuse "));
-});
+})->with([
+    'laravel/dusk' => ['Laravel Dusk (laravel/dusk)', 'dusk/DuskTestCase.php', 'abstract class DuskTestCase extends BaseTestCase'],
+    'symfony/panther with PantherTestCase' => ['Symfony Panther with PantherTestCase', 'panther/PantherTestCase.php', 'abstract class PantherTestCase extends BaseTestCase'],
+]);
 
 it('starts the browser for dmore/chrome-mink-driver as the command line of the README', function (): void {
     $script = (string) file_get_contents(dirname(__DIR__, 2).'/works-with/chrome-mink-driver.php');
-    $section = readmeSection('dmore/chrome-mink-driver');
+    $section = readmeSection('Mink (dmore/chrome-mink-driver)');
     $commands = readmeBlocks($section, 'sh');
-    preg_match_all('/ (--[a-z-]+=?[0-9]*)/', $commands[0] ?? '', $shown);
+    // The first line starts the browser; the second waits until it listens.
+    $lines = explode("\n", $commands[0] ?? '');
+    preg_match_all('/ (--[a-z-]+=?[0-9]*)/', $lines[0], $shown);
     preg_match_all("/'(--[a-z-]+=?[0-9]*)/", $script, $started);
 
     // --no-sandbox depends on the system, so the README names it in its text, not in the command.
     expect($commands)->toHaveCount(1)
+        ->and($lines[1] ?? '')->toEndWith(' http://127.0.0.1:9222/json/version')
         ->and($commands[0])->toStartWith('"$(vendor/bin/cdp-browser path chrome-headless-shell)" ')
         ->and($script)->toContain("exec('vendor/bin/cdp-browser path chrome-headless-shell'")
         ->and($shown[1])->toBe(['--headless', '--remote-debugging-port=9222', '--user-data-dir='])

@@ -8,6 +8,7 @@ declare(strict_types=1);
 namespace Tests\Browser;
 
 use Laravel\Dusk\Browser;
+use PHPUnit\Framework\Assert;
 use Tests\DuskTestCase;
 
 require dirname(__DIR__).'/check.php';
@@ -19,7 +20,10 @@ final class WorksWithTest extends DuskTestCase
         $this->browse(static function (Browser $browser): void {
             $browser->visit('/works-with.html')->assertSeeIn('#ok', 'laravel/dusk');
             $capabilities = $browser->driver->getCapabilities();
+            $size = $browser->driver->manage()->window()->getSize();
 
+            // The README says that the base class keeps the window size of Dusk's own stub.
+            Assert::assertSame([1920, 1080], [$size->getWidth(), $size->getHeight()]);
             check('laravel/dusk', $browser->text('#ok'), 'laravel/dusk', (string) $capabilities->getCapability('browserVersion'), (string) ($capabilities->getCapability('chrome')['chromedriverVersion'] ?? ''));
         });
     }

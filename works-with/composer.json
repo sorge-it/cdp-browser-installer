@@ -6,6 +6,7 @@
         "chrome-php/chrome": "*",
         "dmore/chrome-mink-driver": "*",
         "php-webdriver/webdriver": "*",
+        "phpunit/phpunit": "*",
         "sorge-it/cdp-browser-installer": "*@dev",
         "symfony/panther": "*"
     },

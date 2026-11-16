@@ -21,6 +21,8 @@ use SorgeIt\CdpBrowserInstaller\Platform;
 abstract class DuskTestCase extends BaseTestCase
 {
     // README: begin
+    private static ?Binaries $binaries = null;
+
     #[BeforeClass]
     final public static function prepare(): void
     {
@@ -32,13 +34,15 @@ abstract class DuskTestCase extends BaseTestCase
     {
         $options = new ChromeOptions()->setBinary(self::binaries()->path(Binary::ChromeHeadlessShell));
         $options->addArguments(PHP_OS_FAMILY === 'Linux' ? ['--headless', '--no-sandbox'] : ['--headless']);
+        $options->addArguments(['--window-size=1920,1080']);
 
         return RemoteWebDriver::create('http://localhost:9515', DesiredCapabilities::chrome()->setCapability(ChromeOptions::CAPABILITY, $options));
     }
 
     private static function binaries(): Binaries
     {
-        return Installer::fromEnvironment(getenv())->binaries(Pin::FILE, Platform::current());
+        // Once, in prepare(), where getenv() holds .env only under php artisan dusk.
+        return self::$binaries ??= Installer::fromEnvironment(getenv())->binaries(dirname(__DIR__).'/'.Pin::FILE, Platform::current());
     }
     // README: end
 }

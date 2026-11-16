@@ -2,8 +2,8 @@
 
 ## Supported versions
 
-The latest minor release of 1.x. Fixes are released only there, as patch releases. A new minor
-release ends the fixes for the previous one.
+Only the latest minor release of 2.x is supported. Fixes are released only there, as patch
+releases. A new minor release ends the fixes for the previous one. Release 1.x gets no more fixes.
 
 A fix that refuses a new attack pattern comes as a patch release, even though it can stop an
 install that an earlier release accepted.
@@ -15,7 +15,7 @@ through a GitHub Security Advisory:
 [Report a vulnerability](https://github.com/sorge-it/cdp-browser-installer/security/advisories/new).
 
 Include a pin file, an archive or a call that shows the problem, the platform, and the output of
-`php -v`, `curl --version` and `unzip -v`. If you have a fix, say so in the report; we will then
+`php -v`, `curl --version` and `unzip -v`. If you have a fix, say so in the report; I will then
 open a private fork in the advisory for it. There is no fixed response time.
 
 The package downloads archives from the network and unpacks them, and its `deps` command runs as

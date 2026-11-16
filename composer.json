@@ -1,9 +1,9 @@
 {
     "name": "sorge-it/cdp-browser-installer",
-    "description": "Installs chrome-headless-shell and the chromedriver of the same version from Chrome for Testing, pinned and SHA-256-checked, as a Composer dev dependency for Laravel Dusk, Symfony Panther, php-webdriver and chrome-php, without Node.",
+    "description": "Installs chrome-headless-shell and ChromeDriver of the same version from Chrome for Testing, pinned and SHA-256-checked, for PHP browser tests with Laravel Dusk, Symfony Panther, php-webdriver, chrome-php or Mink on glibc Linux and macOS. No Node.",
     "type": "library",
     "license": "MIT",
-    "keywords": ["ai-agents", "coding-agents", "agentic-engineering", "supply-chain-security", "sha256", "installer", "github-actions", "browser-testing", "e2e-testing", "pest", "phpunit", "chrome-for-testing", "chrome-headless-shell", "chromedriver", "webdriver", "php-webdriver", "dusk", "laravel-dusk", "panther", "symfony-panther", "headless-chrome", "headless-browser", "chromium", "cdp", "chrome-devtools-protocol"],
+    "keywords": ["chrome-for-testing", "chrome-headless-shell", "chromedriver", "laravel-dusk", "symfony-panther", "php-webdriver", "chrome-php", "mink", "webdriver", "cdp", "chrome-devtools-protocol", "headless-chrome", "headless-browser", "browser-testing", "e2e-testing", "sha256", "supply-chain-security", "coding-agents", "composer", "php"],
     "homepage": "https://github.com/sorge-it/cdp-browser-installer",
     "authors": [
         {
