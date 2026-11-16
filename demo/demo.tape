@@ -50,7 +50,7 @@ Wait
 Type "# The archive as a CI cache restores it, with one byte added"
 Enter
 Wait
-Type "dir=~/.cache/cdp-browser/157.0.8103.38/linux-arm64"
+Type "dir=~/.cache/cdp-browser/157.0.8103.78/linux-arm64"
 Enter
 Wait
 Type "rm -r $dir/*/ $dir/.sha256-pair"

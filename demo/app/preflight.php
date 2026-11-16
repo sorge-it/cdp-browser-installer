@@ -13,7 +13,7 @@ use SorgeIt\CdpBrowserInstaller\SystemLibraries;
 
 require __DIR__.'/vendor/autoload.php';
 
-const VERSION = '157.0.8103.38';
+const VERSION = '157.0.8103.78';
 const HASH = '([0-9a-f]{64})';
 
 $pair = getenv('HOME').'/.cache/cdp-browser/'.VERSION.'/linux-arm64';
@@ -41,7 +41,7 @@ $expected = [
     '"$(vendor/bin/cdp-browser path chrome-headless-shell)" --version' => "Google Chrome for Testing {$version}",
     '"$(vendor/bin/cdp-browser path chromedriver)" --version' => "ChromeDriver {$version} \\(.+\\)",
     '# The archive as a CI cache restores it, with one byte added' => '',
-    'dir=~/.cache/cdp-browser/157.0.8103.38/linux-arm64' => '',
+    'dir=~/.cache/cdp-browser/'.VERSION.'/linux-arm64' => '',
     'rm -r $dir/*/ $dir/.sha256-pair' => '',
     'printf x >> $dir/chrome-headless-shell-linux-arm64.zip' => '',
     // ls shows the archive of chromedriver only: the changed archive is gone, and nothing is unpacked.

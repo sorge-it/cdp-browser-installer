@@ -44,7 +44,7 @@ for the download.
 
 ```sh
 composer require --dev sorge-it/cdp-browser-installer
-vendor/bin/cdp-browser pin 157.0.8103.38               # writes the pin file .chrome-version; commit it
+vendor/bin/cdp-browser pin 157.0.8103.78               # writes the pin file .chrome-version; commit it
 vendor/bin/cdp-browser install                         # in each checkout, container and CI run
 vendor/bin/cdp-browser path chrome-headless-shell      # prints the path of the browser
 vendor/bin/cdp-browser path chromedriver               # prints the path of ChromeDriver
@@ -58,7 +58,7 @@ vendor/bin/cdp-browser path chromedriver               # prints the path of Chro
   root first. `install` and `pin` stop as root without `--allow-root` (see [Commands](#commands)).
 - In the
   [text demo](https://github.com/sorge-it/cdp-browser-installer/blob/main/demo/output/demo.txt)
-  on macOS arm64, the first `install` took 13.2 s with the download of the pair, the second 0.0 s.
+  on macOS arm64, the first `install` took 13.3 s with the download of the pair, the second 0.1 s.
 - To upgrade from release 1.x, do each step of
   [Upgrade from 1.x](https://github.com/sorge-it/cdp-browser-installer/blob/main/CHANGELOG.md#upgrade-from-1x).
 
@@ -292,8 +292,8 @@ through a symbolic link: on macOS, Chrome looks for its data files next to the p
 from. Both report the version of the pin file:
 
 ```sh
-"$(vendor/bin/cdp-browser path chrome-headless-shell)" --version   # Google Chrome for Testing 157.0.8103.38
-"$(vendor/bin/cdp-browser path chromedriver)" --version            # ChromeDriver 157.0.8103.38 (…)
+"$(vendor/bin/cdp-browser path chrome-headless-shell)" --version   # Google Chrome for Testing 157.0.8103.78
+"$(vendor/bin/cdp-browser path chromedriver)" --version            # ChromeDriver 157.0.8103.78 (…)
 "$(vendor/bin/cdp-browser path chrome-headless-shell)" --dump-dom 'data:text/html,<p>ok</p>'
 ```
 
@@ -309,18 +309,18 @@ with `--no-sandbox` there; the installer does not decide that for you.
 
 ```json
 {
-    "version": "157.0.8103.38",
+    "version": "157.0.8103.78",
     "chrome-headless-shell": {
-        "linux64": "deafffa74660b34853a4119c361fd427ac8c9fcb62db51ddb8a797cd83a4ba2d",
-        "linux-arm64": "b9b910a57b2a15eb3e55000a2339f93a973934a413ebfc6e585a50ec6c42fd6c",
-        "mac-x64": "79821745d0a72d2ba752d981284ed0a9e6fa320dad133596941a17dba6186de3",
-        "mac-arm64": "e6a6b13551aa12f951d0891d79282606b13742837c8fa0505e1272bae116ce82"
+        "linux64": "f90329720fb61e5a76da9b6b509b6ad12a484c9c5df0359403e935177c6d153a",
+        "linux-arm64": "912fbf877e53de34d7b3cca5104f3b95607d41bd35412ccc6cd2a599ff0c0dbf",
+        "mac-x64": "f1a6a9561eaf1f409849538de663695d36d72fbf1ebca4d42e47c7b5f2a157f3",
+        "mac-arm64": "17bf66d53c1b1104dcb641c5b331cd4ac5d200c778f5feed0934a0b92deaf8d6"
     },
     "chromedriver": {
-        "linux64": "329525fa0bf02be19794de1e9475772ef64695e0456f142888bd70df3147dc1e",
-        "linux-arm64": "8166fad77893cb095a45678f29ebec7ea14a8ac89364d28d52176a6fd4b30262",
-        "mac-x64": "7725504324ce8e8e03f78392ecf288890e082d215f619edd87a2dc1235e780a4",
-        "mac-arm64": "e59394fda6a05067362c225678e185e46e473cebea1593025deb2b2641b75688"
+        "linux64": "0c27ff9aac902d3f7d2d01dde2235c1ff9c320bb8914b3624f4c79d52abacaea",
+        "linux-arm64": "54b2a50b393dd44463242eca9ee2d35a63baa7baf2fd5882daada15fd1f5a5be",
+        "mac-x64": "846074bc958944da0a0a22b007b60ba2fc0dc3d1dc873347537047244b00db68",
+        "mac-arm64": "dc099dc128da1a324d85f877db7930b1ecd38e097aff02996434ebaacf4417bf"
     }
 }
 ```

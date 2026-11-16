@@ -75,7 +75,7 @@ try {
     exec('rm -rf '.escapeshellarg($profile).' '.escapeshellarg($log));
 }
 
-// Such as "HeadlessChrome/157.0.8103.38" or "Chrome/156.0.8078.79".
+// Such as "HeadlessChrome/157.0.8103.78" or "Chrome/156.0.8078.79".
 $product = (string) $version['Browser'];
 
 check('dmore/chrome-mink-driver', $text, 'chrome-mink-driver', substr($product, strpos($product, '/') + 1));

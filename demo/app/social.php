@@ -8,7 +8,7 @@ declare(strict_types=1);
 // Columns of the terminal in social.tape, less the indent: the wrapped lines keep it.
 const WIDTH = 76;
 const CACHE = __DIR__.'/out-social';
-const DIRECTORY = CACHE.'/157.0.8103.38/linux-arm64';
+const DIRECTORY = CACHE.'/157.0.8103.78/linux-arm64';
 
 putenv('CDP_BROWSER_PATH='.CACHE);
 

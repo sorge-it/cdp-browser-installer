@@ -6,7 +6,7 @@
 
 ROOT     := $(abspath $(CURDIR)/..)
 IMAGE    := cdp-browser-installer-demo
-VERSION  := 157.0.8103.38
+VERSION  := 157.0.8103.78
 OUTPUT   ?= $(CURDIR)/output/demo.txt
 # linux-arm64 on each host: demo.tape names its paths.
 PLATFORM := --platform linux/arm64
@@ -25,7 +25,7 @@ build: ## Build the image: VHS with PHP, Composer and the libraries of chrome-he
 
 # `pin` downloads the archive of each binary for each platform, a large download, so a pin file of
 # $(VERSION) stays until `make clean`.
-install: build ## Install the demo app with the package from this checkout, and pin 157.0.8103.38
+install: build ## Install the demo app with the package from this checkout, and pin 157.0.8103.78
 	$(RUN) sh -c '$(COMPOSER) && { grep -qs "\"$(VERSION)\"" .chrome-version || vendor/bin/cdp-browser pin $(VERSION) > /dev/null; }'
 
 preflight: install ## Check that each command of demo.tape prints what the GIF must show
