@@ -16,7 +16,7 @@ it('detects the platform from the system and the machine', function (string $fam
 
 it('names the supported platforms for any other system', function (string $family, string $machine): void {
     expect(fn (): Platform => Platform::detect($family, $machine))->toThrow(installerException(
-        sprintf('Chrome for Testing has no build for %s on %s. The installer supports linux64, linux-arm64, mac-x64, mac-arm64.', $family, $machine),
+        sprintf('The installer does not support %s on %s. It supports linux64, linux-arm64, mac-x64, mac-arm64.', $family, $machine),
     ));
 })->with([
     ['Linux', 'ppc64le'],

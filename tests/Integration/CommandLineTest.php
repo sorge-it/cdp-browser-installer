@@ -43,6 +43,15 @@ it('ends its message with the error output, without the last line break', functi
         });
 });
 
+it('ends its message with a full stop when the tool wrote no error output', function (): void {
+    $this->tools->add('silent', 'fwrite(STDERR, " \n"); exit(4);');
+
+    expect(fn (): string => $this->tools->commandLine()->run(['silent']))
+        ->toThrow(static function (InstallerException $exception): void {
+            expect($exception->getMessage())->toBe('`silent` stopped with exit code 4.');
+        });
+});
+
 it('finds only a file that may run, by its path and in PATH', function (): void {
     mkdir($this->directory.'/plain');
     file_put_contents($this->directory.'/plain/tool', "#!/bin/sh\n");
@@ -69,8 +78,8 @@ it('leaves no file after an answer other than 200, or after curl stopped with pa
         ->toThrow($exception)
         ->and(file_exists($this->directory.'/out.zip'))->toBeFalse();
 })->with([
-    'status 503' => ['echo "503";', downloadException('answered with status 503.')],
-    'status 404' => ['echo "404";', installerException('answered with status 404: version 155.0.8059.39 does not exist for linux64.')],
+    'status 503' => ['echo "503";', downloadException('responded with HTTP status 503.')],
+    'status 404' => ['echo "404";', installerException('responded with HTTP status 404: version 155.0.8059.39 does not exist for linux64.')],
     'curl fails' => ['fwrite(STDERR, "curl: (18) transfer closed\n"); exit(18);', downloadException('`curl` stopped with exit code 18: curl: (18) transfer closed')],
 ]);
 
@@ -79,7 +88,7 @@ it('finds a command in the PATH the process gets, and names a missing one', func
 
     expect($commandLine->run(['curl', 'https://storage.googleapis.com/chrome-for-testing-public/x', '--output', $this->directory.'/out']))->toBe('404')
         ->and(fn (): string => $commandLine->run(['unzip']))
-        ->toThrow(installerException('`unzip` is not installed. On Debian, Ubuntu and Alpine, `cdp-browser deps` installs it.'));
+        ->toThrow(installerException("`unzip` is not installed. Install it with the system's package manager."));
 });
 
 it('finds a tool in a relative or an empty entry of PATH, as a shell does', function (string $path): void {

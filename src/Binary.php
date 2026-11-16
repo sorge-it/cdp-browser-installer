@@ -15,7 +15,7 @@ enum Binary: string
     case Chromedriver = 'chromedriver';
 
     /**
-     * The variable that names the system's binary, such as one of Alpine.
+     * The variable that names the system's binary, such as Alpine's.
      */
     public function variable(): string
     {

@@ -34,7 +34,7 @@ it('downloads nothing on musl, and names the two steps before it reads the pin f
     assert(is_string($file));
 
     expect(fn (): int => $this->cli([], musl: true)->run(['--pin-file' => $file, ...$input]))
-        ->toThrow(installerException("Chrome for Testing is built against glibc and does not start on musl, as on Alpine. Install the system's pair (`cdp-browser deps` runs `apk add chromium chromium-chromedriver`), then set CDP_BROWSER_CHROME to the browser, such as /usr/bin/chromium, and CDP_BROWSER_CHROMEDRIVER to the chromedriver, such as /usr/bin/chromedriver."))
+        ->toThrow(installerException("Chrome for Testing is built against glibc and does not start on musl, as on Alpine. Install the system's pair (`cdp-browser deps` runs `apk add chromium chromium-chromedriver`), then set CDP_BROWSER_CHROME to the browser, such as /usr/bin/chromium, and CDP_BROWSER_CHROMEDRIVER to ChromeDriver, such as /usr/bin/chromedriver."))
         ->and($this->tools->calls('curl'))->toBe([]);
 })->with([
     'install' => [['command' => 'install']],
@@ -88,7 +88,7 @@ it('stops when only one variable of the pair is set, and names the other', funct
     $environment = [$set => $set === Installer::OWN_CHROMEDRIVER ? $this->tools->chromedriver() : $this->tools->browser(), 'HOME' => $this->directory];
 
     expect(fn (): Installer => Installer::fromEnvironment($environment, $this->tools->commandLine(), musl: true))
-        ->toThrow(installerException(sprintf('%s is set, but %s is not. Set both for the pair of the system, such as /usr/bin/chromium and /usr/bin/chromedriver, or neither for the pinned pair.', $set, $missing)))
+        ->toThrow(installerException(sprintf("%s is set, but %s is not. Set both for the system's pair, such as /usr/bin/chromium and /usr/bin/chromedriver, or neither for the pinned pair.", $set, $missing)))
         // `install` and `path` build the installer, so both stop, also on glibc; `pin` and `deps` build none.
         ->and(fn (): int => $this->cli([$set => '/usr/bin/x'])->run(['command' => 'install', '--pin-file' => $this->pinFile]))->toThrow(installerException(sprintf('%s is set, but %s is not.', $set, $missing)))
         ->and(fn (): int => $this->cli([$set => '/usr/bin/x'])->run(['command' => 'path', 'binary' => 'chromedriver', '--pin-file' => $this->pinFile]))->toThrow(installerException(sprintf('%s is set, but %s is not.', $set, $missing)))
@@ -181,7 +181,7 @@ it('stops at a binary that fails on --version', function (Binary $binary, string
         ->toThrow(static function (InstallerException $exception) use ($binary, $failing): void {
             // An exit code has no exception behind it.
             expect($exception::class)->toBe(InstallerException::class)
-                ->and($exception->getMessage())->toContain(sprintf('%1$s `%2$s` does not answer --version. `%2$s` stopped with exit code 1', $binary->variable(), $failing))
+                ->and($exception->getMessage())->toContain(sprintf('%1$s `%2$s` does not respond to `--version`. `%2$s` stopped with exit code 1', $binary->variable(), $failing))
                 ->and($exception->getPrevious())->toBeNull();
         })
         ->and($this->tools->calls($tool.'-failing'))->toBe(['--version']);
@@ -199,7 +199,7 @@ it('gives the cause of a binary past its timeout as the previous exception', fun
         ->toThrow(installerException('exceeded the timeout of 1 seconds.', ProcessTimedOutException::class));
 });
 
-it('installs the chromium and chromium-chromedriver of Alpine through apk as root, and names both variables', function (): void {
+it("installs Alpine's chromium and chromium-chromedriver through apk as root, and names both variables", function (): void {
     $this->tools->packageManager('apk');
     $tester = $this->cli([], musl: true, user: 0);
 

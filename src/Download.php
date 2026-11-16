@@ -22,7 +22,7 @@ final readonly class Download
 
     /**
      * The MD5 that Google Cloud Storage sends in `x-goog-hash`, as 16 bytes, or `null` without
-     * one. Only the last answer counts: a proxy puts the answer to its `CONNECT` first.
+     * one. Only the last response counts: a proxy puts the response to its `CONNECT` first.
      *
      * @param  string  $headers  what `curl --dump-header` wrote
      */
@@ -39,13 +39,13 @@ final readonly class Download
      * Writes the archive to the file, or throws and leaves no archive. The caller removes the
      * file of the headers.
      *
-     * @param  string|null  $headers  a file for the headers of the answer, which `pin` reads; `install` needs none
+     * @param  string|null  $headers  a file for the response headers, which `pin` reads; `install` needs none
      */
     public function to(string $version, Binary $binary, Platform $platform, string $file, ?string $headers = null): void
     {
         $url = self::url($version, $binary, $platform);
         // A missing curl is a cause of the host, not of the download.
-        $this->commandLine->find('curl');
+        new SystemLibraries($this->commandLine)->checkTools('curl');
 
         try {
             $status = $this->commandLine->run([
@@ -79,10 +79,10 @@ final readonly class Download
 
         // A wrong version, such as a typo in `pin`: a retry does not help.
         if ($status === '404') {
-            throw new InstallerException(sprintf('%s answered with status 404: version %s does not exist for %s. Check the version on https://googlechromelabs.github.io/chrome-for-testing/.', $url, $version, $platform->value));
+            throw new InstallerException(sprintf('%s responded with HTTP status 404: version %s does not exist for %s. Check the version on https://googlechromelabs.github.io/chrome-for-testing/.', $url, $version, $platform->value));
         }
 
-        throw new DownloadException(sprintf('%s answered with status %s.%s', $url, $status, str_starts_with($status, '3') ? ' The installer follows no redirect.' : ''));
+        throw new DownloadException(sprintf('%s responded with HTTP status %s.%s', $url, $status, str_starts_with($status, '3') ? ' The installer does not follow redirects.' : ''));
     }
 
     private function remove(string $file): void

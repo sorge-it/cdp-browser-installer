@@ -33,7 +33,7 @@ enum Platform: string
             ['Darwin', 'x64'] => self::MacX64,
             ['Darwin', 'arm64'] => self::MacArm64,
             default => throw new InstallerException(sprintf(
-                'Chrome for Testing has no build for %s on %s. The installer supports %s.',
+                'The installer does not support %s on %s. It supports %s.',
                 $family,
                 $machine,
                 implode(', ', array_map(static fn (self $platform): string => $platform->value, self::cases())),

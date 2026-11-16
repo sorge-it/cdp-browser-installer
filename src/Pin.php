@@ -20,7 +20,7 @@ final readonly class Pin
     public const string FILE = '.chrome-version';
 
     /**
-     * `\z`, not `$`: `$` also takes a line break at the end.
+     * `\z`, not `$`: `$` also matches before a line break at the end.
      */
     private const string VERSION = '/\A\d+\.\d+\.\d+\.\d+\z/';
 
@@ -47,20 +47,21 @@ final readonly class Pin
     public static function checkVersion(string $version): void
     {
         if (preg_match(self::VERSION, $version) !== 1) {
-            throw new InstallerException(sprintf('`%s` is not a Chrome for Testing version, such as 155.0.8059.39.', $version));
+            throw new InstallerException(sprintf('`%s` is not a Chrome for Testing version. Use four numbers, such as 155.0.8059.39.', $version));
         }
     }
 
     public static function read(string $file): self
     {
         if (! is_file($file)) {
-            throw new InstallerException(sprintf('There is no pin file at %s. Write one with `cdp-browser pin <version>`.', $file));
+            // A relative path counts from the working directory, which a test runner may change.
+            throw new InstallerException(sprintf('There is no pin file at %s, seen from the working directory %s. Write one with `cdp-browser pin <version>`.', $file, (string) getcwd()));
         }
 
         $content = Files::quietly(static fn (): string|false => file_get_contents($file));
 
         if ($content === false) {
-            throw new InstallerException(sprintf('The pin file %s could not be read.', $file));
+            throw new InstallerException(sprintf('The pin file %s could not be read. Check that this user can read it.', $file));
         }
 
         try {
@@ -73,12 +74,12 @@ final readonly class Pin
             throw self::incomplete($file);
         }
 
-        // The form of version 1 pins the browser only. Its hashes cannot become a pair.
+        // The format of release 1.x pins the browser only. Its hashes cannot become a pair.
         if (array_key_exists('sha256', $data)) {
             // The message prints the version, so only a checked one reaches the terminal.
             self::checkVersion($data['version']);
 
-            throw new InstallerException(sprintf('The pin file %s pins chrome-headless-shell only, in the form of version 1. Write it again with `cdp-browser pin %s`: it pins chrome-headless-shell and chromedriver.', $file, $data['version']));
+            throw new InstallerException(sprintf('The pin file %s pins chrome-headless-shell only, in the format of release 1.x. Write it again with `cdp-browser pin %s`: it pins chrome-headless-shell and chromedriver.', $file, $data['version']));
         }
 
         $hashes = [];
@@ -111,7 +112,7 @@ final readonly class Pin
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
         if (! Files::write(Files::target($file), $json."\n")) {
-            throw new InstallerException(sprintf('The pin file %s could not be written.', $file));
+            throw new InstallerException(sprintf('The pin file %s could not be written. Check that this user can write to it and to its directory.', $file));
         }
     }
 

@@ -71,8 +71,8 @@ final class PinCommand extends Command
                 foreach (Platform::cases() as $platform) {
                     $output->writeln(sprintf('Download %s', Download::url($version, $binary, $platform)));
                     new Download($commandLine)->to($version, $binary, $platform, $file, $headers);
-                    $this->checkMd5($file, is_file($headers) ? $this->read($headers, static fn (): string|false => file_get_contents($headers)) : '', $binary, $platform, $output);
-                    $hashes[$binary->value][$platform->value] = $this->read($file, static fn (): string|false => hash_file('sha256', $file));
+                    $this->checkMd5($file, is_file($headers) ? $this->read($headers, $version, static fn (): string|false => file_get_contents($headers)) : '', $version, $binary, $platform, $output);
+                    $hashes[$binary->value][$platform->value] = $this->read($file, $version, static fn (): string|false => hash_file('sha256', $file));
 
                     // A response with status 200 can also be an error page. Only an archive that
                     // `install` unpacks gets a pin. After a failure, the tree goes with the directory.
@@ -100,12 +100,12 @@ final class PinCommand extends Command
      *
      * @param  Closure(): (string|false)  $read
      */
-    private function read(string $file, Closure $read): string
+    private function read(string $file, string $version, Closure $read): string
     {
         $content = Files::quietly($read);
 
         if ($content === false) {
-            throw new InstallerException(sprintf('The file %s of the download could not be read; no pin was written.', $file));
+            throw new InstallerException(sprintf('The downloaded file %s could not be read; no pin was written. Run `cdp-browser pin %s` again.', $file, $version));
         }
 
         return $content;
@@ -121,7 +121,7 @@ final class PinCommand extends Command
         $directory = dirname($target);
 
         if (file_exists($target) && ! is_file($target)) {
-            throw new InstallerException(sprintf('The pin file %s is not a file. Remove it, or name another file with --pin-file.', $pinFile));
+            throw new InstallerException(sprintf('The pin file %s is not a file. Remove it, or name another file with `--pin-file`.', $pinFile));
         }
 
         if (! is_dir($directory) || ! is_writable($directory)) {
@@ -133,20 +133,20 @@ final class PinCommand extends Command
      * The MD5 of the storage finds a broken download. It comes from the same server as the
      * archive, so it finds no changed source; without it, the SHA-256 alone checks `install`.
      */
-    private function checkMd5(string $file, string $headers, Binary $binary, Platform $platform, OutputInterface $output): void
+    private function checkMd5(string $file, string $headers, string $version, Binary $binary, Platform $platform, OutputInterface $output): void
     {
         $expected = Download::md5($headers);
 
         if ($expected === null) {
-            $output->writeln(sprintf('The storage sent no MD5 for %s on %s; pin compared none. The SHA-256 in the pin still checks install.', $binary->value, $platform->value));
+            $output->writeln(sprintf('The storage sent no MD5 for %s on %s, so `pin` compared none. `install` still checks the archive against the SHA-256 in the pin file.', $binary->value, $platform->value));
 
             return;
         }
 
-        $actual = $this->read($file, static fn (): string|false => md5_file($file, true));
+        $actual = $this->read($file, $version, static fn (): string|false => md5_file($file, true));
 
         if ($actual !== $expected) {
-            throw new ChecksumException(sprintf('The MD5 of the download of %s for %s is %s, the storage sent %s in x-goog-hash. The download is broken; no pin was written.', $binary->value, $platform->value, base64_encode($actual), base64_encode($expected)));
+            throw new ChecksumException(sprintf('The MD5 of the download for %s on %s is %s, but the storage sent %s in `x-goog-hash`. The download is broken; no pin was written. Run `cdp-browser pin %s` again.', $binary->value, $platform->value, base64_encode($actual), base64_encode($expected), $version));
         }
     }
 }

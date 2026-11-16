@@ -22,6 +22,9 @@ final readonly class Unpack
      */
     public function to(string $archive, Binary $binary, Platform $platform, string $directory): void
     {
+        // The message of safe-unzip for a missing tool names no step for this system.
+        new SystemLibraries($this->commandLine)->checkTools('unzip', 'zipinfo');
+
         try {
             $zip = new ZipArchive(environment: $this->commandLine->environment(), timeout: $this->commandLine->timeout());
             // safe-unzip always checks: `CHECKCONS` changes nothing, and `close()` only forgets the listing.

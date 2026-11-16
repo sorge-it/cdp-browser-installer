@@ -12,7 +12,7 @@ use Throwable;
 
 /**
  * Puts the pair of chrome-headless-shell and chromedriver under `<cache>/<version>/<platform>/`,
- * or uses a pair the system brings. Each archive stays beside its tree. Its SHA-256 is checked
+ * or uses the system's pair. Each archive stays beside its tree. Its SHA-256 is checked
  * before it is unpacked.
  */
 final readonly class Installer
@@ -23,17 +23,17 @@ final readonly class Installer
     public const string OWN_CHROME = 'CDP_BROWSER_CHROME';
 
     /**
-     * The system's chromedriver. Only together with `OWN_CHROME`.
+     * The system's ChromeDriver. Only together with `OWN_CHROME`.
      */
     public const string OWN_CHROMEDRIVER = 'CDP_BROWSER_CHROMEDRIVER';
 
     /**
-     * The seconds of each tool, such as the whole download by curl.
+     * The timeout in seconds for each tool run, such as the whole download by curl.
      */
     public const string TIMEOUT = 'CDP_BROWSER_TIMEOUT';
 
     /**
-     * The seconds an install waits for another one in the same directory.
+     * How many seconds an install waits for another one in the same directory.
      */
     public const string LOCK_TIMEOUT = 'CDP_BROWSER_LOCK_TIMEOUT';
 
@@ -56,6 +56,11 @@ final readonly class Installer
     private const int STOPPED = 120;
 
     private const int LOCK_SECONDS = 600;
+
+    /**
+     * The next step for an archive that cannot be read: the run removes its file of the archive.
+     */
+    private const string READ_AGAIN = 'Run `cdp-browser install` again: it downloads the archive again.';
 
     private ?string $cache;
 
@@ -100,11 +105,11 @@ final readonly class Installer
         $browser = $environment[self::OWN_CHROME] ?? '';
         $chromedriver = $environment[self::OWN_CHROMEDRIVER] ?? '';
 
-        // A browser of the system and a pinned chromedriver, or the reverse, can differ in version.
+        // A system browser and a pinned ChromeDriver, or the reverse, can differ in version.
         if (($browser === '') !== ($chromedriver === '')) {
             [$set, $missing] = $browser === '' ? [self::OWN_CHROMEDRIVER, self::OWN_CHROME] : [self::OWN_CHROME, self::OWN_CHROMEDRIVER];
 
-            throw new InstallerException(sprintf('%s is set, but %s is not. Set both for the pair of the system, such as %s and %s, or neither for the pinned pair.', $set, $missing, Binary::ChromeHeadlessShell->alpinePath(), Binary::Chromedriver->alpinePath()));
+            throw new InstallerException(sprintf("%s is set, but %s is not. Set both for the system's pair, such as %s and %s, or neither for the pinned pair.", $set, $missing, Binary::ChromeHeadlessShell->alpinePath(), Binary::Chromedriver->alpinePath()));
         }
 
         $commandLine = Environment::applyTimeout($environment, $commandLine);
@@ -221,7 +226,7 @@ final readonly class Installer
                 }
 
                 if (! Files::write($directory.'/'.self::STAMP, $this->stamp($pin, $platform))) {
-                    throw new InstallerException(sprintf('The stamp in %s could not be written.', $directory));
+                    throw new InstallerException(sprintf('The stamp in %1$s could not be written. Check that this user can write to %1$s.', $directory));
                 }
             }
         } finally {
@@ -276,7 +281,7 @@ final readonly class Installer
     private function move(string $from, string $to): void
     {
         if (! Files::quietly(static fn (): bool => rename($from, $to))) {
-            throw new InstallerException(sprintf('%s could not be moved to %s.%s', $from, $to, file_exists($from) ? '' : ' Another install removed it, as where flock() does not exclude it. Run `cdp-browser install` again.'));
+            throw new InstallerException(sprintf('%s could not be moved to %s.%s', $from, $to, file_exists($from) ? '' : ' Another install removed it, which happens where flock() does not lock, as on some shared file systems. Run `cdp-browser install` again.'));
         }
     }
 
@@ -296,7 +301,7 @@ final readonly class Installer
             // A second run without a working lock removes a `.part-*` file by its age, and a rename
             // keeps the old age of a file that a cache restored. So the time is set before the rename.
             if (is_file($archive) && ! Files::quietly(static fn (): bool => touch($archive))) {
-                throw new InstallerException(sprintf('The archive %s of the cache could not get a new modification time. Remove it; the next `cdp-browser install` downloads it again.', $archive));
+                throw new InstallerException(sprintf('The modification time of the cached archive %s could not be updated. Remove the archive; the next `cdp-browser install` downloads it again.', $archive));
             }
 
             // Without an archive in the cache, or when another run took it first, this run downloads.
@@ -340,7 +345,7 @@ final readonly class Installer
     }
 
     /**
-     * Each binary of the system's pair must be an absolute path to a program that answers
+     * Each binary of the system's pair must be an absolute path to a program that responds to
      * `--version`.
      */
     private function checkOwn(Binaries $own): Binaries
@@ -353,7 +358,7 @@ final readonly class Installer
                 throw new InstallerException(sprintf('%s must be an absolute path, not `%s`.', $variable, $path));
             }
 
-            // Before `run()`: its message for a missing tool names `deps`, which installs nothing at this path.
+            // Before `run()`: its message for a missing tool names the package manager, not the variable that set this path.
             if (! $this->commandLine->has($path)) {
                 throw new InstallerException(sprintf('%1$s `%2$s` is not an executable file. Set %1$s to the path of an existing binary, such as %3$s.', $variable, $path, $binary->alpinePath()));
             }
@@ -361,7 +366,7 @@ final readonly class Installer
             try {
                 $this->commandLine->run([$path, '--version']);
             } catch (InstallerException $installerException) {
-                throw new InstallerException(sprintf('%s `%s` does not answer --version. %s', $variable, $path, $installerException->getMessage()), $installerException->getPrevious());
+                throw new InstallerException(sprintf('%s `%s` does not respond to `--version`. %s', $variable, $path, $installerException->getMessage()), $installerException->getPrevious());
             }
         }
 
@@ -387,7 +392,12 @@ final readonly class Installer
 
         while (! $lock->flock(LOCK_EX | LOCK_NB)) {
             if (microtime(true) >= $deadline) {
-                throw new InstallerException(sprintf('Another install in %s held the lock for %d seconds.', $directory, $this->lockTimeout));
+                // With a timeout of 0, the run did not wait. The timeout comes from the variable or from `$lockTimeout`.
+                $cause = $this->lockTimeout === 0
+                    ? sprintf('Another install in %s holds the lock, and the lock timeout is 0.', $directory)
+                    : sprintf('Another install in %s held the lock for %d %s.', $directory, $this->lockTimeout, $this->lockTimeout === 1 ? 'second' : 'seconds');
+
+                throw new InstallerException(sprintf('%s Run `cdp-browser install` again when the other install has ended, or raise the lock timeout (%s) above the duration of one install.', $cause, self::LOCK_TIMEOUT));
             }
 
             usleep(200_000);
@@ -405,7 +415,7 @@ final readonly class Installer
         $handle = Files::quietly(static fn (): mixed => fopen($file, 'rb'));
 
         if ($handle === false) {
-            throw new InstallerException(sprintf('The archive %s could not be read.', $archive));
+            throw new InstallerException(sprintf('The archive %s could not be read. %s', $archive, self::READ_AGAIN));
         }
 
         $context = hash_init('sha256');
@@ -414,7 +424,7 @@ final readonly class Installer
             // Blocks of 1 MiB. A failed read ends with an error, not with the hash of part of the file.
             while (($block = Files::quietly(static fn (): string|false => fread($handle, 1_048_576))) !== '') {
                 if ($block === false) {
-                    throw new InstallerException(sprintf('The archive %s could not be read.', $archive));
+                    throw new InstallerException(sprintf('The archive %s could not be read. %s', $archive, self::READ_AGAIN));
                 }
 
                 hash_update($context, $block);
@@ -426,7 +436,7 @@ final readonly class Installer
         $actual = hash_final($context);
 
         if ($actual !== $expected) {
-            throw new ChecksumException(sprintf('The SHA-256 of %s is %s, the pin expects %s. The archive is deleted and was not unpacked.', $archive, $actual, $expected));
+            throw new ChecksumException(sprintf('The SHA-256 of %s is %s, but the pin expects %s. The archive is deleted and was not unpacked.', $archive, $actual, $expected));
         }
     }
 

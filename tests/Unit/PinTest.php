@@ -94,7 +94,7 @@ it('names the command that writes a pin of version 1 again', function (): void {
     file_put_contents($file, json_encode(['version' => '155.0.8059.39', 'sha256' => hashes()['chrome-headless-shell']]));
 
     expect(fn (): Pin => Pin::read($file))->toThrow(installerException(sprintf(
-        'The pin file %s pins chrome-headless-shell only, in the form of version 1. Write it again with `cdp-browser pin 155.0.8059.39`: it pins chrome-headless-shell and chromedriver.',
+        'The pin file %s pins chrome-headless-shell only, in the format of release 1.x. Write it again with `cdp-browser pin 155.0.8059.39`: it pins chrome-headless-shell and chromedriver.',
         $file,
     )));
 });
@@ -131,7 +131,7 @@ it('keeps the whole old pin file when the write of the new one fails', function 
         InstallerException::class,
     );
 
-    expect(php($code))->toBe([sprintf('The pin file %s could not be written.', $file), 0])
+    expect(php($code))->toBe([sprintf('The pin file %s could not be written. Check that this user can write to it and to its directory.', $file), 0])
         ->and(file_get_contents($file))->toBe($old)
         ->and(glob($file.'*'))->toBe([$file]);
 })->skip(! function_exists('pcntl_signal'), 'The test needs pcntl to ignore SIGXFSZ.');
@@ -156,7 +156,7 @@ it('names a pin file that it cannot read as a cause of the file system', functio
     chmod($file, 0o000);
 
     expect(fn (): mixed => underErrorExceptions(static fn (): Pin => Pin::read($file)))
-        ->toThrow(installerException(sprintf('The pin file %s could not be read.', $file)));
+        ->toThrow(installerException(sprintf('The pin file %s could not be read. Check that this user can read it.', $file)));
 })->skip(posix_geteuid() === 0, 'Root reads a file of mode 0000.');
 
 it('names a pin file that it cannot write over a directory', function (): void {

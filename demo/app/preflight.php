@@ -45,7 +45,7 @@ $expected = [
     'rm -r $dir/*/ $dir/.sha256-pair' => '',
     'printf x >> $dir/chrome-headless-shell-linux-arm64.zip' => '',
     // ls shows the archive of chromedriver only: the changed archive is gone, and nothing is unpacked.
-    'vendor/bin/cdp-browser install; ls $dir' => "The SHA-256 of {$tree}\\.zip is [0-9a-f]{64}, the pin expects {pin}\\. The archive is deleted and was not unpacked\\.\nchromedriver-linux-arm64\\.zip",
+    'vendor/bin/cdp-browser install; ls $dir' => "The SHA-256 of {$tree}\\.zip is [0-9a-f]{64}, but the pin expects {pin}\\. The archive is deleted and was not unpacked\\.\nchromedriver-linux-arm64\\.zip",
 ];
 
 // The commands whose output the GIF shows: each `Type`, without the setup of the shell and `clear`.

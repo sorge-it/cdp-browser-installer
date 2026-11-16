@@ -64,7 +64,10 @@ final readonly class CommandLine
         }
 
         if (! $process->isSuccessful()) {
-            throw new InstallerException(sprintf('`%s` stopped with exit code %d: %s', $name, $process->getExitCode(), trim($process->getErrorOutput())));
+            // A tool that writes no error output ends the sentence without a colon.
+            $error = trim($process->getErrorOutput());
+
+            throw new InstallerException(sprintf('`%s` stopped with exit code %d%s', $name, $process->getExitCode(), $error === '' ? '.' : ': '.$error));
         }
 
         return $process->getOutput();
@@ -91,7 +94,7 @@ final readonly class CommandLine
     }
 
     /**
-     * @return int the seconds of each process
+     * @return int the timeout in seconds for each process
      *
      * @internal
      */
@@ -135,7 +138,7 @@ final readonly class CommandLine
      */
     public function find(string $name): string
     {
-        return $this->path($name) ?? throw new InstallerException(sprintf('`%s` is not installed. On Debian, Ubuntu and Alpine, `cdp-browser deps` installs it.', $name));
+        return $this->path($name) ?? throw new InstallerException(sprintf("`%s` is not installed. Install it with the system's package manager.", $name));
     }
 
     /**
