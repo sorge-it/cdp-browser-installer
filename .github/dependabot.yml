@@ -3,7 +3,7 @@ version: 2
 updates:
   # Each action is pinned to a commit. Dependabot moves the commit and the version comment
   # together. Composer is not here: the lock serves only the tests, and the `newest` job takes
-  # the new versions on each run.
+  # the new versions on each run, except PHPStan from 2.3.6 on (see tests.yml).
   - package-ecosystem: github-actions
     directory: /
     schedule:
