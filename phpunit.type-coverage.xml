@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Only for `composer test:type-coverage`. Its script names this file with the long option and an
+     equals sign: the plugin sees neither `-c` nor the long option with a space. The plugin reads
+     only the `<directory>` entries of `<source><include>`, no `<file>` and no `<exclude>`, and
+     only `*.php`, so bin/cdp-browser has PHPStan but no type coverage. phpunit.xml cannot list
+     tests/: its line coverage of 100 % would measure them too. tests/Unit/CoverageTest.php checks
+     this file with the plugin's own reader. -->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd">
+    <source>
+        <include>
+            <directory>src</directory>
+            <directory>tests</directory>
+        </include>
+    </source>
+</phpunit>

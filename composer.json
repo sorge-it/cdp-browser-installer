@@ -55,7 +55,7 @@
         ],
         "test:unit": "pest",
         "test:types": "phpstan --memory-limit=160M",
-        "test:type-coverage": "@php -d memory_limit=1G vendor/bin/pest --type-coverage --min=100 --no-cache",
+        "test:type-coverage": "@php -d memory_limit=1G vendor/bin/pest --type-coverage --min=100 --no-cache --configuration=phpunit.type-coverage.xml",
         "test:coverage": "@php -d memory_limit=1G vendor/bin/pest --coverage --min=100",
         "test:lint": [
             "pint --test",

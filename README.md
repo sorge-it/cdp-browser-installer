@@ -69,9 +69,10 @@ starts neither binary for a test.
 
 **Trust.** [Security](#security) lists seven rules, each with the code that implements it.
 [Limits of the security model](#limits-of-the-security-model) lists what the installer does not
-check. `composer test` requires PHPStan level max and 100 % type coverage, and CI requires 100 %
-line coverage. Each week, a workflow checks the SHA-256 values in this repository's pin file
-against Chrome for Testing.
+check. `composer test` requires PHPStan level max for bin/, src/ and tests/, and 100 % type
+coverage for src/ and tests/; the type coverage does not count the return types of functions and
+closures. CI requires 100 % line coverage. Each week, a workflow checks the SHA-256 values in this
+repository's pin file against Chrome for Testing.
 
 ## Works with
 
@@ -854,7 +855,8 @@ into an `ErrorException`, as Laravel's does.
 ## Tests
 
 ```sh
-composer test           # pint, rector, PHPStan level max, type coverage 100 %, every suite
+composer test           # pint, rector, PHPStan level max, type coverage 100 %, every suite;
+                        # each tool checks tests/ as well
 composer test:coverage  # line coverage 100 %, with pcov; a CI job
 ```
 
