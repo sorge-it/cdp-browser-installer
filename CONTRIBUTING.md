@@ -49,7 +49,7 @@ that counts as caught may have escaped: check it by hand.
 
 The code must run on PHP 8.4, on Linux with glibc and musl, and on macOS. When a message or a step
 of the demo changes, record the demo again. Both commands need network access: `pin` downloads
-the archive of each binary for each platform of version 157.0.8103.38.
+the archive of each binary for each platform of version 157.0.8103.78.
 
 - `make -C demo record` writes the text demo on your machine and needs PHP 8.4, Composer, curl and
   unzip.
