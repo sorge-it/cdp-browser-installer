@@ -53,6 +53,8 @@ jobs:
 
     strategy:
       fail-fast: false
+      # composer.json holds PHPStan below 2.3.6 for the row `newest`: 2.3.6 removed a method that
+      # pest-plugin-type-coverage calls. CONTRIBUTING.md says when to lift the bound.
       matrix:
         include:
           # The lowest versions that composer.json and the development packages allow, also of

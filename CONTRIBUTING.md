@@ -33,6 +33,13 @@ table of the README, usually `InstallerException`.
 Run the two checks under [Tests](README.md#tests) in the README. `composer lint` runs rector, then
 pint, and fixes what they find.
 
+`composer.json` holds PHPStan below 2.3.6. PHPStan 2.3.6 removed
+`AnalyserResult::getCollectedData()`, which `pest-plugin-type-coverage` 5.x calls, and its worker
+needs more than the 160M of `test:types`. The bound also holds back, without an error, each
+release of the plugin or of Rector that needs 2.3.6. Lift it once a release of the plugin works
+with 2.3.6: raise the minimum of the plugin to that release, and `--memory-limit` as far as PHPStan
+needs.
+
 To run mutation testing by hand: `vendor/bin/pest --mutate --everything --covered-only`, without
 `--parallel`. In Pest 5.3, `--parallel` counts every mutant as caught: 717 of 717 in 17 seconds,
 while a serial run of the same code found 24 untested and 3 timeouts. On 1.0.0, the serial run
