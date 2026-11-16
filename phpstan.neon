@@ -1,7 +1,8 @@
 parameters:
     level: max
     paths:
-        - bin
+        # A directory gives PHPStan only its *.php files; bin/cdp-browser has no suffix.
+        - bin/cdp-browser
         - src
         - tests
     reportUnmatchedIgnoredErrors: true
