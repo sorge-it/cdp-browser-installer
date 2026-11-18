@@ -25,7 +25,7 @@ try {
     $page = $browser->createPage();
     $page->navigate('data:text/html,<p id="ok">chrome-php</p>')->waitForNavigation();
     $text = $page->evaluate('document.getElementById("ok")?.textContent ?? null')->getReturnValue();
-    // Such as "HeadlessChrome/157.0.8103.78".
+    // Such as "HeadlessChrome/158.0.8127.36".
     $product = (string) $browser->getConnection()->sendMessageSync(new Message('Browser.getVersion'))->getResultData('product');
 } finally {
     $browser->close();

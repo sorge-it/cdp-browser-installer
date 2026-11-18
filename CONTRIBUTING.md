@@ -49,7 +49,7 @@ that counts as caught may have escaped: check it by hand.
 
 The code must run on PHP 8.4, on Linux with glibc and musl, and on macOS. When a message or a step
 of the demo changes, record the demo again. Both commands need network access: `pin` downloads
-the archive of each binary for each platform of version 157.0.8103.78.
+the archive of each binary for each platform of version 158.0.8127.36.
 
 - `make -C demo record` writes the text demo on your machine and needs PHP 8.4, Composer, curl and
   unzip.
@@ -61,10 +61,11 @@ the archive of each binary for each platform of version 157.0.8103.78.
 
 ## When the Chrome for Testing check fails
 
-The workflow `chrome-for-testing` runs each Monday, on demand, and on a pull request that changes
-`.chrome-version` or the workflow. It has two jobs, and each job fails independently. GitHub sends
-the notice of a scheduled run to the user who created the workflow or last changed its `cron`
-line. Do not make either job a required check: a new Stable would block pull requests.
+The workflow `chrome-for-testing` runs each Monday, on demand, and on a pull request or a push to
+`main` that changes `.chrome-version` or the workflow. It has two jobs, and each job fails
+independently. GitHub sends the notice of a scheduled run to the user who created the workflow or
+last changed its `cron` line. Do not make either job a required check: a new Stable would block
+pull requests.
 
 - **Red in `Chrome for Testing · SHA-256`:** the job runs `pin` for the version of
   `.chrome-version` again, into a pin file of its own: one download for each binary and each

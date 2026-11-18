@@ -44,7 +44,7 @@ for the download.
 
 ```sh
 composer require --dev sorge-it/cdp-browser-installer
-vendor/bin/cdp-browser pin 157.0.8103.78               # writes the pin file .chrome-version; commit it
+vendor/bin/cdp-browser pin 158.0.8127.36               # writes the pin file .chrome-version; commit it
 vendor/bin/cdp-browser install                         # in each checkout, container and CI run
 vendor/bin/cdp-browser path chrome-headless-shell      # prints the path of the browser
 vendor/bin/cdp-browser path chromedriver               # prints the path of ChromeDriver
@@ -58,7 +58,7 @@ vendor/bin/cdp-browser path chromedriver               # prints the path of Chro
   root first. `install` and `pin` stop as root without `--allow-root` (see [Commands](#commands)).
 - In the
   [text demo](https://github.com/sorge-it/cdp-browser-installer/blob/main/demo/output/demo.txt)
-  on macOS arm64, the first `install` took 13.3 s with the download of the pair, the second 0.1 s.
+  on macOS arm64, the first `install` took 12.1 s with the download of the pair, the second 0.0 s.
 - To upgrade from release 1.x, do each step of
   [Upgrade from 1.x](https://github.com/sorge-it/cdp-browser-installer/blob/main/CHANGELOG.md#upgrade-from-1x).
 
@@ -293,8 +293,8 @@ through a symbolic link: on macOS, Chrome looks for its data files next to the p
 from. Both report the version of the pin file:
 
 ```sh
-"$(vendor/bin/cdp-browser path chrome-headless-shell)" --version   # Google Chrome for Testing 157.0.8103.78
-"$(vendor/bin/cdp-browser path chromedriver)" --version            # ChromeDriver 157.0.8103.78 (…)
+"$(vendor/bin/cdp-browser path chrome-headless-shell)" --version   # Google Chrome for Testing 158.0.8127.36
+"$(vendor/bin/cdp-browser path chromedriver)" --version            # ChromeDriver 158.0.8127.36 (…)
 "$(vendor/bin/cdp-browser path chrome-headless-shell)" --dump-dom 'data:text/html,<p>ok</p>'
 ```
 
@@ -310,18 +310,18 @@ with `--no-sandbox` there; the installer does not decide that for you.
 
 ```json
 {
-    "version": "157.0.8103.78",
+    "version": "158.0.8127.36",
     "chrome-headless-shell": {
-        "linux64": "f90329720fb61e5a76da9b6b509b6ad12a484c9c5df0359403e935177c6d153a",
-        "linux-arm64": "912fbf877e53de34d7b3cca5104f3b95607d41bd35412ccc6cd2a599ff0c0dbf",
-        "mac-x64": "f1a6a9561eaf1f409849538de663695d36d72fbf1ebca4d42e47c7b5f2a157f3",
-        "mac-arm64": "17bf66d53c1b1104dcb641c5b331cd4ac5d200c778f5feed0934a0b92deaf8d6"
+        "linux64": "2d3a23017323c54fd457a678e4351f895c4076d8050e39d5aa6247f93448b73a",
+        "linux-arm64": "176ee5c55486c22de43128871189061365ea28e881fc96016fd18e7cb59437c8",
+        "mac-x64": "e0c5d07d8f5bcc5bdd5ef370e7daf3770856b585fcc9eecf441c7e3bb2e3d1cf",
+        "mac-arm64": "c24d40a3786322ff3a5e3ac6eed162226cbaf07ebe468715407827226b0f8897"
     },
     "chromedriver": {
-        "linux64": "0c27ff9aac902d3f7d2d01dde2235c1ff9c320bb8914b3624f4c79d52abacaea",
-        "linux-arm64": "54b2a50b393dd44463242eca9ee2d35a63baa7baf2fd5882daada15fd1f5a5be",
-        "mac-x64": "846074bc958944da0a0a22b007b60ba2fc0dc3d1dc873347537047244b00db68",
-        "mac-arm64": "dc099dc128da1a324d85f877db7930b1ecd38e097aff02996434ebaacf4417bf"
+        "linux64": "d20e70d69d68c5c983e2526452ed0779fd65dc4ade5d6741f1bb3d0d82754d3a",
+        "linux-arm64": "cbb268390b87b79ad8543364bbf5cc851b1403a2ce76c2636dfc2fbe8e196b7d",
+        "mac-x64": "707e35dcfc37c73305ceea27b8a3dba357b3f663562790975962293ad37efe1d",
+        "mac-arm64": "e44347354ea6a7b666e4ef03803974e1344f78ce9c4466acd896ea6af53136e8"
     }
 }
 ```
@@ -336,8 +336,8 @@ and a URL for each download. So `pin` computes the SHA-256 from its own download
 change to it: the pin is the point where you trust Google.
 
 The workflow [`chrome-for-testing`](https://github.com/sorge-it/cdp-browser-installer/actions/workflows/chrome-for-testing.yml)
-checks the pin file of this repository each Monday, on demand, and on each pull request that
-changes the pin file or the workflow. It has two jobs:
+checks the pin file of this repository each Monday, on demand, and on each pull request and each
+push to `main` that changes the pin file or the workflow. It has two jobs:
 
 - `Chrome for Testing · SHA-256` runs `pin` again for the pinned version. It fails when `pin`
   fails or a SHA-256 differs. When Chrome for Testing serves other bytes for the pinned version,
