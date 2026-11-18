@@ -12,7 +12,7 @@ use SorgeIt\CdpBrowserInstaller\Pin;
  * browser or a ChromeDriver of another version than the pair. Else it prints the result, and adds
  * a row to the summary of the run on GitHub Actions.
  *
- * @param  string  $browser  the version that the browser reports through the tool, such as `157.0.8103.78`
+ * @param  string  $browser  the version that the browser reports through the tool, such as `158.0.8127.36`
  * @param  string|null  $chromedriver  the `chromedriverVersion` that ChromeDriver reports; `null` for a tool that talks to the browser directly
  */
 function check(string $tool, ?string $text, string $expected, string $browser, ?string $chromedriver = null): void

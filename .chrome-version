@@ -1,15 +1,15 @@
 {
-    "version": "157.0.8103.78",
+    "version": "158.0.8127.36",
     "chrome-headless-shell": {
-        "linux64": "f90329720fb61e5a76da9b6b509b6ad12a484c9c5df0359403e935177c6d153a",
-        "linux-arm64": "912fbf877e53de34d7b3cca5104f3b95607d41bd35412ccc6cd2a599ff0c0dbf",
-        "mac-x64": "f1a6a9561eaf1f409849538de663695d36d72fbf1ebca4d42e47c7b5f2a157f3",
-        "mac-arm64": "17bf66d53c1b1104dcb641c5b331cd4ac5d200c778f5feed0934a0b92deaf8d6"
+        "linux64": "2d3a23017323c54fd457a678e4351f895c4076d8050e39d5aa6247f93448b73a",
+        "linux-arm64": "176ee5c55486c22de43128871189061365ea28e881fc96016fd18e7cb59437c8",
+        "mac-x64": "e0c5d07d8f5bcc5bdd5ef370e7daf3770856b585fcc9eecf441c7e3bb2e3d1cf",
+        "mac-arm64": "c24d40a3786322ff3a5e3ac6eed162226cbaf07ebe468715407827226b0f8897"
     },
     "chromedriver": {
-        "linux64": "0c27ff9aac902d3f7d2d01dde2235c1ff9c320bb8914b3624f4c79d52abacaea",
-        "linux-arm64": "54b2a50b393dd44463242eca9ee2d35a63baa7baf2fd5882daada15fd1f5a5be",
-        "mac-x64": "846074bc958944da0a0a22b007b60ba2fc0dc3d1dc873347537047244b00db68",
-        "mac-arm64": "dc099dc128da1a324d85f877db7930b1ecd38e097aff02996434ebaacf4417bf"
+        "linux64": "d20e70d69d68c5c983e2526452ed0779fd65dc4ade5d6741f1bb3d0d82754d3a",
+        "linux-arm64": "cbb268390b87b79ad8543364bbf5cc851b1403a2ce76c2636dfc2fbe8e196b7d",
+        "mac-x64": "707e35dcfc37c73305ceea27b8a3dba357b3f663562790975962293ad37efe1d",
+        "mac-arm64": "e44347354ea6a7b666e4ef03803974e1344f78ce9c4466acd896ea6af53136e8"
     }
 }

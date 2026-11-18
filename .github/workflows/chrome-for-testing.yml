@@ -5,6 +5,12 @@ on:
     paths:
       - .chrome-version
       - .github/workflows/chrome-for-testing.yml
+  # After the merge of a new pin, so that the badge of main shows the new pin.
+  push:
+    branches: [main]
+    paths:
+      - .chrome-version
+      - .github/workflows/chrome-for-testing.yml
   # Weekly, as Chrome for Testing changes without a commit here: other bytes for the pinned
   # version, or a newer Stable.
   schedule:

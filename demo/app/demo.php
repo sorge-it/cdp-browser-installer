@@ -10,7 +10,7 @@ use SorgeIt\CdpBrowserInstaller\Platform;
 
 require __DIR__.'/vendor/autoload.php';
 
-const VERSION = '157.0.8103.78';
+const VERSION = '158.0.8127.36';
 const CACHE = '.cache/cdp-browser';
 
 // The cache stays inside the demo app; ~/.cache is left alone.
