@@ -4,7 +4,7 @@ All notable changes to this package are in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.1] - Unreleased
+## [2.0.1] - 2026-11-19
 
 The API, the commands, the options and the exit codes stay as in 2.0.0. A lock timeout still ends
 `install` with exit code 1, although its message now says to run `cdp-browser install` again.
@@ -199,7 +199,7 @@ the SHA-256 before each unpack, also for an archive that a CI cache restored, an
 tools. The README states what the installer refuses, what it checks, and what it does not check.
 The 0.x releases were private.
 
-[2.0.1]: https://github.com/sorge-it/cdp-browser-installer/compare/v2.0.0...HEAD
+[2.0.1]: https://github.com/sorge-it/cdp-browser-installer/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/sorge-it/cdp-browser-installer/compare/v1.0.1...v2.0.0
 [1.0.1]: https://github.com/sorge-it/cdp-browser-installer/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/sorge-it/cdp-browser-installer/releases/tag/v1.0.0
