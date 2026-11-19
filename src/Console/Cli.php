@@ -30,7 +30,7 @@ final class Cli
     /**
      * The help of `--allow-root` of `install` and `pin`.
      */
-    public const string ALLOW_ROOT = 'Run as root, as in a container where no other user follows. A later run as another user cannot replace what root writes';
+    public const string ALLOW_ROOT = 'Allow running as root, as in a container where only root runs. A later run as another user cannot replace the files that root writes';
 
     /**
      * A command builds the installer and finds the platform only when it runs: `list`, `pin` and
@@ -38,7 +38,7 @@ final class Cli
      *
      * @param  array<string, string>  $environment
      * @param  int  $user  the effective user id
-     * @param  Closure(): Platform  $platform  as a rule `Platform::current(...)`
+     * @param  Closure(): Platform  $platform  usually `Platform::current(...)`
      * @param  bool|null  $musl  whether Linux runs on musl; `null` detects it
      */
     public static function application(
@@ -88,18 +88,18 @@ final class Cli
         // A package that another one replaces or provides has no version of its own.
         $version = class_exists(InstalledVersions::class) && InstalledVersions::isInstalled($package) ? InstalledVersions::getPrettyVersion($package) : null;
 
-        return $version ?? sprintf('of no known version: Composer does not list %s', $package);
+        return $version ?? sprintf('(unknown version: Composer does not list %s)', $package);
     }
 
     /**
      * Only `deps` needs root. A browser or a pin file owned by root breaks the next run as a
-     * normal user; in a container where no other user follows, `--allow-root` takes that risk.
+     * normal user; in a container where only root runs, `--allow-root` takes that risk.
      */
     public static function refuseRoot(int $user, string $command, bool $allowed): void
     {
         if ($user === 0 && ! $allowed) {
             throw new InstallerException(sprintf(
-                '`%s` does not run as root: it writes files that root owns, and a later run as another user cannot replace them. Only `deps` needs root. Where no other user runs it, as in a container, add --allow-root.',
+                '`%s` refuses to run as root: it writes files that root owns, and a later run as another user cannot replace them. Only `deps` needs root. In a container where only root runs, add `--allow-root`.',
                 $command,
             ));
         }

@@ -26,7 +26,7 @@ final class Files
 
         // Another worker may have made it since the check.
         if (! is_dir($directory)) {
-            throw new InstallerException(sprintf('The directory %s could not be created.', $directory));
+            throw new InstallerException(sprintf('The directory %s could not be created. Check that no part of the path is a file, and that this user can write to the deepest directory of it that exists.', $directory));
         }
     }
 

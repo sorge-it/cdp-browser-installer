@@ -78,7 +78,7 @@ it('names an archive of the cache whose modification time it cannot set, and the
 
     $output = installWithFunctions($this->directory, $this->tools, $this->pin, FAILING_TOUCH);
 
-    expect($output)->toBe(sprintf('%s: The archive %s/chrome-headless-shell-linux-arm64.zip of the cache could not get a new modification time. Remove it; the next `cdp-browser install` downloads it again.', InstallerException::class, $this->target))
+    expect($output)->toBe(sprintf('%s: The modification time of the cached archive %s/chrome-headless-shell-linux-arm64.zip could not be updated. Remove the archive; the next `cdp-browser install` downloads it again.', InstallerException::class, $this->target))
         // No `.part-*` file with the old time of the archive.
         ->and(scandir($this->target))->toBe(['.', '..', '.lock', 'chrome-headless-shell-linux-arm64.zip']);
 });
@@ -91,7 +91,7 @@ it('names the next step when another install removed its archive during the unpa
     expect(fn (): mixed => underErrorExceptions(fn (): Binaries => $this->installer->install($this->pin, Platform::LinuxArm64)))
         ->toThrow(static function (InstallerException $exception): void {
             expect($exception::class)->toBe(InstallerException::class)
-                ->and($exception->getMessage())->toMatch('~\A\S+/linux-arm64/chrome-headless-shell-linux-arm64\.zip\.part-[0-9a-f]{8} could not be moved to \S+/linux-arm64/chrome-headless-shell-linux-arm64\.zip\. Another install removed it, as where flock\(\) does not exclude it\. Run `cdp-browser install` again\.\z~');
+                ->and($exception->getMessage())->toMatch('~\A\S+/linux-arm64/chrome-headless-shell-linux-arm64\.zip\.part-[0-9a-f]{8} could not be moved to \S+/linux-arm64/chrome-headless-shell-linux-arm64\.zip\. Another install removed it, which happens where flock\(\) does not lock, as on some shared file systems\. Run `cdp-browser install` again\.\z~');
         })
         // No stamp: the next run unpacks the pair again.
         ->and(scandir($this->target))->toBe(['.', '..', '.lock', 'chrome-headless-shell-linux-arm64']);
@@ -107,22 +107,23 @@ it('names an archive that it cannot read to the end, and hashes no part of it', 
         }
         PHP);
 
-    expect($output)->toBe(sprintf('%s: The archive %s/chrome-headless-shell-linux-arm64.zip could not be read.', InstallerException::class, $this->target))
+    expect($output)->toBe(sprintf('%s: The archive %s/chrome-headless-shell-linux-arm64.zip could not be read. Run `cdp-browser install` again: it downloads the archive again.', InstallerException::class, $this->target))
         ->and(scandir($this->target))->toBe(['.', '..', '.lock']);
 });
 
 it('names a cache directory that it cannot create below a file', function (): void {
+    // A file two levels above the target, not at the target itself.
     touch($this->directory.'/cache');
 
     expect(fn (): mixed => underErrorExceptions(fn (): string => $this->installer->install($this->pin, Platform::LinuxArm64)->path(Binary::ChromeHeadlessShell)))
-        ->toThrow(installerException(sprintf('The directory %s could not be created.', $this->target)));
+        ->toThrow(installerException(sprintf('The directory %s could not be created. Check that no part of the path is a file, and that this user can write to the deepest directory of it that exists.', $this->target)));
 });
 
 it('names a cache directory that it cannot create in a read-only directory', function (): void {
     mkdir($this->directory.'/cache', 0o555);
 
     expect(fn (): mixed => underErrorExceptions(fn (): string => $this->installer->install($this->pin, Platform::LinuxArm64)->path(Binary::ChromeHeadlessShell)))
-        ->toThrow(installerException(sprintf('The directory %s could not be created.', $this->target)));
+        ->toThrow(installerException(sprintf('The directory %s could not be created. Check that no part of the path is a file, and that this user can write to the deepest directory of it that exists.', $this->target)));
 })->skip(posix_geteuid() === 0, 'Root writes into a directory of mode 0555.');
 
 it('names a lock file that it cannot open', function (string $kind, string $previous): void {
@@ -177,7 +178,7 @@ it('names a stamp that it cannot write, and leaves no new file', function (): vo
     mkdir($this->target.'/.sha256-pair', 0o755, true);
 
     expect(fn (): mixed => underErrorExceptions(fn (): string => $this->installer->install($this->pin, Platform::LinuxArm64)->path(Binary::ChromeHeadlessShell)))
-        ->toThrow(installerException(sprintf('The stamp in %s could not be written.', $this->target)))
+        ->toThrow(installerException(sprintf('The stamp in %1$s could not be written. Check that this user can write to %1$s.', $this->target)))
         ->and(glob($this->target.'/.sha256-pair.*'))->toBe([]);
 });
 
@@ -341,7 +342,7 @@ it('keeps the error of the download when it cannot remove the download', functio
 
     try {
         expect(fn (): mixed => underErrorExceptions(fn (): string => $this->installer->install($this->pin, Platform::LinuxArm64)->path(Binary::ChromeHeadlessShell)))
-            ->toThrow(downloadException('answered with status 503.'))
+            ->toThrow(downloadException('responded with HTTP status 503.'))
             ->and(glob($this->target.'/*.part-*'))->toHaveCount(1);
     } finally {
         chmod($this->target, 0o755);

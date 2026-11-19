@@ -146,7 +146,7 @@ it('checks the version before it downloads', function (string $version): void {
     $tester = new CommandTester(new PinCommand(fn (): CommandLine => $this->tools->commandLine(), 1000));
 
     expect(fn (): int => $tester->execute(['version' => $version, '--pin-file' => $this->directory.'/pinned']))
-        ->toThrow(installerException(sprintf('`%s` is not a Chrome for Testing version, such as 155.0.8059.39.', $version)))
+        ->toThrow(installerException(sprintf('`%s` is not a Chrome for Testing version. Use four numbers, such as 155.0.8059.39.', $version)))
         ->and($this->tools->calls('curl'))->toBe([])
         ->and($tester->getDisplay())->toBe('');
 })->with([
@@ -171,7 +171,7 @@ it('names a directory for the archives that it cannot create', function (): void
     [$output, $exitCode] = php($code, settings: ['-d', 'sys_temp_dir='.$this->directory.'/tmp']);
 
     expect($exitCode)->toBe(0)
-        ->and($output)->toMatch('~\A'.preg_quote(sprintf('The directory %s/tmp/cdp-browser-pin-', $this->directory), '~').'[0-9a-f]{16} could not be created\.\z~')
+        ->and($output)->toMatch('~\A'.preg_quote(sprintf('The directory %s/tmp/cdp-browser-pin-', $this->directory), '~').'[0-9a-f]{16} could not be created\. Check that no part of the path is a file, and that this user can write to the deepest directory of it that exists\.\z~')
         ->and($this->tools->calls('curl'))->toBe([]);
 })->skip(posix_geteuid() === 0, 'Root writes into a directory of mode 0555.');
 
@@ -191,7 +191,7 @@ it('refuses a character of the cache check in its temporary directory, before th
 
     // unzip reads `[` in the path of the archive as a pattern.
     expect(php($code, settings: ['-d', 'sys_temp_dir='.$this->directory.'/tmp[1]']))
-        ->toBe([sprintf('The temporary directory %s/tmp[1] holds `*`, `?`, `[`, `]`, `\` or a line break, which unzip reads as a pattern or zipinfo prints as two lines. Set TMPDIR, or sys_temp_dir in php.ini, to a path without them.', $this->directory), 0])
+        ->toBe([sprintf('The temporary directory %s/tmp[1] contains `*`, `?`, `[`, `]`, `\` or a line break, which unzip reads as a pattern or zipinfo prints as two lines. Set TMPDIR, or sys_temp_dir in php.ini, to a path without them.', $this->directory), 0])
         ->and($this->tools->calls('curl'))->toBe([]);
 });
 
@@ -231,9 +231,9 @@ it('resolves and checks a temporary directory in this process', function (): voi
             ->and(Environment::temporaryDirectory($this->directory.'/a[1]'))->toBe($this->directory.'/a[1]')
             ->and(Environment::temporaryDirectory($this->directory.'/x[1]/..'))->toBe($this->directory.'/x[1]/..')
             ->and(fn (): string => Environment::temporaryDirectory('tmp[1]'))
-            ->toThrow(installerException(sprintf('The temporary directory %s/tmp[1] holds `*`', $this->directory)))
+            ->toThrow(installerException(sprintf('The temporary directory %s/tmp[1] contains `*`', $this->directory)))
             ->and(fn (): string => Environment::temporaryDirectory($this->directory.'/link'))
-            ->toThrow(installerException(sprintf('The temporary directory %s/real[1] holds `*`', realpath($this->directory))));
+            ->toThrow(installerException(sprintf('The temporary directory %s/real[1] contains `*`', realpath($this->directory))));
     } finally {
         chdir($before);
     }
@@ -254,7 +254,7 @@ it('puts its directory in the root for TMPDIR=/, as PHP gives an empty temporary
     [$output, $exitCode] = php($code, ['TMPDIR' => '/']);
 
     expect($exitCode)->toBe(0)
-        ->and($output)->toMatch('~\AThe directory /cdp-browser-pin-[0-9a-f]{16} could not be created\.\z~')
+        ->and($output)->toMatch('~\AThe directory /cdp-browser-pin-[0-9a-f]{16} could not be created\. Check that no part of the path is a file, and that this user can write to the deepest directory of it that exists\.\z~')
         ->and($this->tools->calls('curl'))->toBe([]);
 })->skip(posix_geteuid() === 0, 'Root writes into the root directory.');
 
@@ -271,7 +271,7 @@ it('checks the pin file before the first download', function (Closure $arrange, 
         mkdir($this->directory.'/pinned');
 
         return $this->directory.'/pinned';
-    }), 'The pin file %s is not a file. Remove it, or name another file with --pin-file.'],
+    }), 'The pin file %s is not a file. Remove it, or name another file with `--pin-file`.'],
     'in a missing directory' => [onTestCase(fn (): string => $this->directory.'/missing/pinned'), 'The pin file %s cannot be written: the directory %s does not exist or is not writable.'],
     // `write()` would replace the link with a file.
     'a link to a missing file' => [onTestCase(function (): string {
@@ -344,7 +344,7 @@ it('writes no pin for a download whose MD5 differs from x-goog-hash, and keeps t
     $tester = new CommandTester(new PinCommand(fn (): CommandLine => $this->tools->commandLine(), 1000));
 
     expect(fn (): int => $tester->execute(['version' => '155.0.8059.39', '--pin-file' => $this->pinFile]))
-        ->toThrow(checksumException(sprintf('The MD5 of the download of chrome-headless-shell for %s is %s, the storage sent %s in x-goog-hash. The download is broken; no pin was written.', $platform->value, base64_encode((string) md5_file($archive, true)), $other)))
+        ->toThrow(checksumException(sprintf('The MD5 of the download for chrome-headless-shell on %s is %s, but the storage sent %s in `x-goog-hash`. The download is broken; no pin was written. Run `cdp-browser pin 155.0.8059.39` again.', $platform->value, base64_encode((string) md5_file($archive, true)), $other)))
         ->and(file_get_contents($this->pinFile))->toBe($old)
         ->and($this->tools->calls('curl'))->toHaveCount($downloads)
         ->and(pinDirectories($this->tools))->toHaveCount(1)
@@ -369,7 +369,7 @@ it('ends pin with exit code 1 and the message of the file system for a download 
     $exitCode = underErrorExceptions(fn (): int => $tester->run(['command' => 'pin', 'version' => '155.0.8059.39', '--pin-file' => $this->directory.'/pinned'], ['capture_stderr_separately' => true]));
 
     expect($exitCode)->toBe(1)
-        ->and($tester->getErrorOutput())->toMatch('~\AThe file '.preg_quote(sys_get_temp_dir().'/cdp-browser-pin-', '~').'[0-9a-f]{16}/archive\.zip of the download could not be read; no pin was written\.\n\z~')
+        ->and($tester->getErrorOutput())->toMatch('~\AThe downloaded file '.preg_quote(sys_get_temp_dir().'/cdp-browser-pin-', '~').'[0-9a-f]{16}/archive\.zip could not be read; no pin was written\. Run `cdp-browser pin 155\.0\.8059\.39` again\.\n\z~')
         ->and(file_exists($this->directory.'/pinned'))->toBeFalse()
         ->and(array_filter(pinDirectories($this->tools), file_exists(...)))->toBe([]);
 })->skip(posix_geteuid() === 0, 'Root reads a file of mode 0000.');
@@ -400,7 +400,7 @@ it('names a file of the download that it cannot read as a cause of the file syst
     [$output, $exitCode] = php($code);
 
     expect($exitCode)->toBe(0)
-        ->and($output)->toMatch('~\A'.preg_quote(InstallerException::class.': The file '.sys_get_temp_dir().'/cdp-browser-pin-', '~').'[0-9a-f]{16}/'.preg_quote($file, '~').' of the download could not be read; no pin was written\.\z~')
+        ->and($output)->toMatch('~\A'.preg_quote(InstallerException::class.': The downloaded file '.sys_get_temp_dir().'/cdp-browser-pin-', '~').'[0-9a-f]{16}/'.preg_quote($file, '~').' could not be read; no pin was written\. Run `cdp-browser pin 155\.0\.8059\.39` again\.\z~')
         ->and(file_exists($this->directory.'/pinned'))->toBeFalse()
         ->and($this->tools->calls('curl'))->toHaveCount(1)
         ->and(array_filter(pinDirectories($this->tools), file_exists(...)))->toBe([]);
@@ -418,7 +418,7 @@ it('pins without an MD5 in x-goog-hash, and says so for each archive', function 
     $tester->execute(['version' => '155.0.8059.39', '--pin-file' => $file]);
 
     expect(Pin::read($file)->hash(Binary::Chromedriver, Platform::MacArm64))->toBe(hash_file('sha256', $this->directory.'/chromedriver-mac-arm64.zip'))
-        ->and($tester->getDisplay())->toBe(pinDownloads(static fn (Binary $binary, Platform $platform): string => sprintf("The storage sent no MD5 for %s on %s; pin compared none. The SHA-256 in the pin still checks install.\n", $binary->value, $platform->value))
+        ->and($tester->getDisplay())->toBe(pinDownloads(static fn (Binary $binary, Platform $platform): string => sprintf("The storage sent no MD5 for %s on %s, so `pin` compared none. `install` still checks the archive against the SHA-256 in the pin file.\n", $binary->value, $platform->value))
             .sprintf("Wrote 155.0.8059.39 to %s. Review the change before you commit it.\n", $file));
 })->with([
     'no x-goog-hash' => "HTTP/2 {status}\r\ncontent-type: application/zip\r\n\r\n",
@@ -445,7 +445,7 @@ it('runs install and pin as root only with --allow-root, and names the risk and 
     /** @var array{command: string} $input */
     expect(fn () => $this->cli(user: 0)->run($input + ['--pin-file' => $this->pinFile]))
         ->toThrow(installerException(sprintf(
-            '`%s` does not run as root: it writes files that root owns, and a later run as another user cannot replace them. Only `deps` needs root. Where no other user runs it, as in a container, add --allow-root.',
+            '`%s` refuses to run as root: it writes files that root owns, and a later run as another user cannot replace them. Only `deps` needs root. In a container where only root runs, add `--allow-root`.',
             $input['command'],
         )))
         ->and($this->tools->calls('curl'))->toBe([]);
@@ -499,7 +499,7 @@ it('stops only the commands that read CDP_BROWSER_TIMEOUT or CDP_BROWSER_LOCK_TI
         'install with the system pair' => [1000, $own, ['command' => 'install']],
         'path with the system pair' => [1000, $own, ['command' => 'path', 'binary' => 'chromedriver']],
     ];
-    $message = sprintf('%s `%s` is not a whole number of seconds above 0, such as %d.', $variable, $value, $example);
+    $message = sprintf('%s `%s` is not a whole number of seconds above 0. Use digits only, such as %d.', $variable, $value, $example);
     $results = [];
 
     foreach ($commands as $name => [$user, $environment, $input]) {
@@ -541,14 +541,14 @@ it('prints the version that Composer installed', function (): void {
 });
 
 it('names the reason when Composer did not install the package', function (): void {
-    expect(Cli::version('sorge-it/elsewhere'))->toBe('of no known version: Composer does not list sorge-it/elsewhere');
+    expect(Cli::version('sorge-it/elsewhere'))->toBe('(unknown version: Composer does not list sorge-it/elsewhere)');
 });
 
 it('names the reason without the autoloader of Composer', function (): void {
     $process = new Process([PHP_BINARY, '-r', sprintf('require %s; echo %s::version(%s);', var_export(dirname(__DIR__, 2).'/src/Console/Cli.php', true), Cli::class, var_export(Cli::PACKAGE, true))]);
     $process->mustRun();
 
-    expect($process->getOutput())->toBe('of no known version: Composer does not list sorge-it/cdp-browser-installer');
+    expect($process->getOutput())->toBe('(unknown version: Composer does not list sorge-it/cdp-browser-installer)');
 });
 
 it('installs the fixed package list through apt as root, and shows its output', function (): void {
@@ -565,7 +565,7 @@ it('installs the fixed package list through apt as root, and shows its output', 
 
 it('needs root for the system libraries', function (): void {
     expect(fn () => $this->cli()->run(['command' => 'deps']))
-        ->toThrow(installerException('`deps` installs packages through apt or apk and needs root. Run it with sudo.'))
+        ->toThrow(installerException('`deps` installs packages through apt or apk and needs root. Run it as root, such as with sudo.'))
         ->and($this->tools->calls('apt-get'))->toBe([]);
 });
 
@@ -642,7 +642,7 @@ it('ends bin/cdp-browser with the message and exit code 1 when the command stops
     $code = sprintf('$_SERVER["argv"] = ["cdp-browser", "pin", "1.2"]; require %s;', var_export(dirname(__DIR__, 2).'/bin/cdp-browser', true));
 
     expect(php($code, ['CDP_BROWSER_PATH' => $this->directory.'/cache']))
-        ->toBe(["`1.2` is not a Chrome for Testing version, such as 155.0.8059.39.\n", 1]);
+        ->toBe(["`1.2` is not a Chrome for Testing version. Use four numbers, such as 155.0.8059.39.\n", 1]);
 });
 
 it('prints only the message of an InstallerException on the error output, without file, line, usage or wrap, and ends with its exit code', function (array $input, string $message, int $exitCode): void {
@@ -663,7 +663,7 @@ it('prints only the message of an InstallerException on the error output, withou
     ],
     'a ChecksumException' => [
         onTestCase(fn (): array => ['command' => 'pin', 'version' => '155.0.8059.39', '--pin-file' => $this->directory.'/pinned']),
-        onTestCase(fn (): string => sprintf('The MD5 of the download of chrome-headless-shell for linux64 is %s, the storage sent %s in x-goog-hash. The download is broken; no pin was written.', base64_encode((string) md5_file($this->archive, true)), base64_encode(md5('other', true)))),
+        onTestCase(fn (): string => sprintf('The MD5 of the download for chrome-headless-shell on linux64 is %s, but the storage sent %s in `x-goog-hash`. The download is broken; no pin was written. Run `cdp-browser pin 155.0.8059.39` again.', base64_encode((string) md5_file($this->archive, true)), base64_encode(md5('other', true)))),
         65,
     ],
     'a DownloadException' => [
@@ -672,12 +672,12 @@ it('prints only the message of an InstallerException on the error output, withou
 
             return ['command' => 'install', '--pin-file' => $this->pinFile];
         }),
-        sprintf('%s answered with status 503.', Download::url('155.0.8059.39', Binary::ChromeHeadlessShell, Platform::LinuxX64)),
+        sprintf('%s responded with HTTP status 503.', Download::url('155.0.8059.39', Binary::ChromeHeadlessShell, Platform::LinuxX64)),
         75,
     ],
     'a message with a tag of Symfony' => [
         onTestCase(fn (): array => ['command' => 'path', 'binary' => 'chromedriver', '--pin-file' => $this->directory.'/<info>pin</info>']),
-        onTestCase(fn (): string => sprintf('There is no pin file at %s/<info>pin</info>. Write one with `cdp-browser pin <version>`.', $this->directory)),
+        onTestCase(fn (): string => sprintf('There is no pin file at %s/<info>pin</info>, seen from the working directory %s. Write one with `cdp-browser pin <version>`.', $this->directory, getcwd())),
         1,
     ],
     'with --quiet' => [
@@ -750,7 +750,7 @@ it('runs the commands that need no cache directory without HOME, and names the v
         ->and($depsed)->toBe(PHP_OS_FAMILY === 'Darwin' ? 0 : 1)
         ->and($deps)->toContain(PHP_OS_FAMILY === 'Darwin' ? 'Nothing to do.' : '`deps` installs packages through apt or apk and needs root.')
         ->and($pathed)->toBe(1)
-        ->and($path)->toContain('Neither CDP_BROWSER_PATH, an absolute XDG_CACHE_HOME nor HOME is set, so there is no cache directory.')
+        ->and($path)->toContain('Neither CDP_BROWSER_PATH, an absolute XDG_CACHE_HOME nor HOME is set, so there is no cache directory. Set CDP_BROWSER_PATH to an absolute path.')
         ->not()->toContain('Fatal error');
 })->skip(posix_geteuid() === 0, 'pin does not run as root.');
 
@@ -787,7 +787,7 @@ it('finds the platform only for a command that needs it', function (): void {
 
     expect($tester->getDisplay())->toContain('Wrote 155.0.8059.39 to')
         ->and(fn (): int => $tester->run(['command' => 'install', '--pin-file' => $this->pinFile]))
-        ->toThrow(installerException('Chrome for Testing has no build for Windows on AMD64.'));
+        ->toThrow(installerException('The installer does not support Windows on AMD64.'));
 });
 
 it('lists the four commands', function (): void {

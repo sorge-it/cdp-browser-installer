@@ -137,13 +137,34 @@ it('throws an InstallerException for each exception of safe-unzip, and keeps tha
     })],
 ]);
 
-it('names a missing curl as a tool of the host, not as a download', function (): void {
-    // The real rm, unzip and zipinfo, and no curl.
-    $installer = new Installer(new CommandLine(['PATH' => $this->directory.'/tools/system']), $this->directory.'/cache', musl: false);
+it('names the step for a missing tool of install, by the package manager that deps finds first', function (string $missing, array $managers, string $step): void {
+    /** @var list<'apk'|'apt-get'> $managers */
+    $path = $this->directory.'/path';
+    mkdir($path);
+    $tools = ['curl' => $this->directory.'/tools/bin/curl', 'rm' => $this->directory.'/tools/system/rm', 'unzip' => $this->directory.'/tools/system/unzip', 'zipinfo' => $this->directory.'/tools/system/zipinfo'];
 
+    foreach (array_diff_key($tools, [$missing => true]) as $tool => $file) {
+        symlink($file, $path.'/'.$tool);
+    }
+
+    foreach ($managers as $manager) {
+        symlink($this->tools->packageManager($manager), $path.'/'.$manager);
+    }
+
+    $installer = new Installer(new CommandLine(['PATH' => $path]), $this->directory.'/cache', musl: false);
+
+    // A missing curl is a cause of the host, so no DownloadException.
     expect(fn (): Binaries => $installer->install($this->pin, Platform::LinuxArm64))
-        ->toThrow(installerException('`curl` is not installed. On Debian, Ubuntu and Alpine, `cdp-browser deps` installs it.'));
-});
+        ->toThrow(installerException(sprintf('`%s` is not installed. %s', $missing, $step)))
+        ->and($this->tools->calls('apk'))->toBe([])
+        ->and($this->tools->calls('apt-get'))->toBe([]);
+})->with(['curl', 'unzip', 'zipinfo'])->with([
+    'apt-get, as on Debian and Ubuntu' => [['apt-get'], 'Run `cdp-browser deps` as root: it installs curl and unzip through apt.'],
+    // Through apk, deps installs Alpine's pair, which `install` uses without curl or unzip; `pin` needs both.
+    'apk, as on Alpine' => [['apk'], 'Run `apk add curl unzip` as root: through apk, `cdp-browser deps` installs neither.'],
+    'apk beside apt-get, as deps takes apk first' => [['apt-get', 'apk'], 'Run `apk add curl unzip` as root: through apk, `cdp-browser deps` installs neither.'],
+    'neither, as on macOS' => [[], "Install curl and unzip with the system's package manager."],
+]);
 
 it('keeps the first error when the removal in its finally fails', function (string $command): void {
     $archive = zipArchive($this->directory.'/readme.zip', ['readme' => ['x', 0o100644]]);

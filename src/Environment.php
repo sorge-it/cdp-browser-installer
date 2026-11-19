@@ -47,7 +47,7 @@ final class Environment
         $home = $environment['HOME'] ?? '';
 
         if ($home === '') {
-            throw new InstallerException('Neither CDP_BROWSER_PATH, an absolute XDG_CACHE_HOME nor HOME is set, so there is no cache directory.');
+            throw new InstallerException('Neither CDP_BROWSER_PATH, an absolute XDG_CACHE_HOME nor HOME is set, so there is no cache directory. Set CDP_BROWSER_PATH to an absolute path.');
         }
 
         return self::cacheDirectory(sprintf('HOME `%s`', $home), self::absolute('HOME', $home).'/.cache/cdp-browser');
@@ -124,7 +124,7 @@ final class Environment
 
         // `filter_var()` also takes spaces, a sign and leading zeros around the number.
         if (! is_int($seconds) || (string) $seconds !== $value) {
-            throw new InstallerException(sprintf('%s `%s` is not a whole number of seconds above 0, such as %d.', $variable, $value, $example));
+            throw new InstallerException(sprintf('%s `%s` is not a whole number of seconds above 0. Use digits only, such as %d.', $variable, $value, $example));
         }
 
         return $seconds;
@@ -141,7 +141,7 @@ final class Environment
     {
         foreach ($paths as $checked) {
             if (strpbrk($checked, "*?[]\\\n") !== false) {
-                throw new InstallerException(sprintf('%s %s holds `*`, `?`, `[`, `]`, `\\` or a line break, which unzip reads as a pattern or zipinfo prints as two lines. %s', $label, $checked, $next));
+                throw new InstallerException(sprintf('%s %s contains `*`, `?`, `[`, `]`, `\\` or a line break, which unzip reads as a pattern or zipinfo prints as two lines. %s', $label, $checked, $next));
             }
         }
     }

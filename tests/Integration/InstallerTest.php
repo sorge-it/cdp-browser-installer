@@ -131,7 +131,7 @@ it('stops at a wrong SHA-256 of chromedriver after it unpacked the browser, and 
 
     expect(fn (): Binaries => $this->installer->install($changed, Platform::LinuxArm64))
         ->toThrow(checksumException(sprintf(
-            'The SHA-256 of %s/chromedriver-linux-arm64.zip is %s, the pin expects %s. The archive is deleted and was not unpacked.',
+            'The SHA-256 of %s/chromedriver-linux-arm64.zip is %s, but the pin expects %s. The archive is deleted and was not unpacked.',
             $this->target,
             hash_file('sha256', $this->chromedriverArchive),
             $changed->hash(Binary::Chromedriver, Platform::LinuxArm64),
@@ -146,7 +146,7 @@ it('keeps the browser archive when chromedriver fails, and downloads only chrome
     mkdir($this->target, 0o755, true);
     copy($this->archive, $this->target.'/chrome-headless-shell-linux-arm64.zip');
 
-    expect(fn (): Binaries => $this->installer->install($this->pin, Platform::LinuxArm64))->toThrow(downloadException('chromedriver-linux-arm64.zip answered with status 503.'))
+    expect(fn (): Binaries => $this->installer->install($this->pin, Platform::LinuxArm64))->toThrow(downloadException('chromedriver-linux-arm64.zip responded with HTTP status 503.'))
         ->and(file_exists($this->target.'/chrome-headless-shell-linux-arm64.zip'))->toBeTrue()
         // The browser comes first and is unpacked; without a stamp, the pair is not installed.
         ->and(file_exists($this->target.'/chrome-headless-shell-linux-arm64'))->toBeTrue()
@@ -259,7 +259,7 @@ it('stops and deletes the archive when its SHA-256 differs from the pin', functi
     // The download is checked before it takes the place of the archive.
     expect(fn (): Binaries => $this->installer->install($changed, Platform::LinuxArm64))
         ->toThrow(checksumException(sprintf(
-            'The SHA-256 of %s/chrome-headless-shell-linux-arm64.zip is %s, the pin expects %s. The archive is deleted and was not unpacked.',
+            'The SHA-256 of %s/chrome-headless-shell-linux-arm64.zip is %s, but the pin expects %s. The archive is deleted and was not unpacked.',
             $this->target,
             hash_file('sha256', $this->archive),
             $changed->hash(Binary::ChromeHeadlessShell, Platform::LinuxArm64),
@@ -393,7 +393,7 @@ it('stops at a file that is no ZIP archive', function (): void {
         ->toThrow(installerException('is no ZIP archive: zipinfo finds no end record.', InvalidArchiveException::class));
 });
 
-it('follows no redirect, names a missing version, and leaves no file', function (int|string $status, string $class, string $message): void {
+it('does not follow redirects, names a missing version, and leaves no file', function (int|string $status, string $class, string $message): void {
     /** @var 'fail'|int $status */
     $this->tools->respondWith($status);
     $url = Download::url(VERSION, Binary::ChromeHeadlessShell, Platform::LinuxArm64);
@@ -406,11 +406,11 @@ it('follows no redirect, names a missing version, and leaves no file', function 
         })
         ->and(scandir($this->target))->toBe(['.', '..', '.lock']);
 })->with([
-    'redirect' => [302, DownloadException::class, '%s answered with status 302. The installer follows no redirect.'],
+    'redirect' => [302, DownloadException::class, '%s responded with HTTP status 302. The installer does not follow redirects.'],
     // A retry does not help: a human fixes the version.
-    'missing' => [404, InstallerException::class, '%s answered with status 404: version 155.0.8059.39 does not exist for linux-arm64. Check the version on https://googlechromelabs.github.io/chrome-for-testing/.'],
+    'missing' => [404, InstallerException::class, '%s responded with HTTP status 404: version 155.0.8059.39 does not exist for linux-arm64. Check the version on https://googlechromelabs.github.io/chrome-for-testing/.'],
     // Only a 3xx is a redirect.
-    'an error of the server' => [503, DownloadException::class, '%s answered with status 503.'],
+    'an error of the server' => [503, DownloadException::class, '%s responded with HTTP status 503.'],
     'curl fails' => ['fail', DownloadException::class, 'The download of %s stopped. `curl` stopped with exit code 6: curl: (6) Could not resolve host'],
 ]);
 
@@ -424,13 +424,27 @@ it('waits for another install in the same directory, and gives up after its time
 
     // flock() locks an open file, so a second open file of the same process waits too.
     expect(fn (): Binaries => $installer->install($this->pin, Platform::LinuxArm64))
-        ->toThrow(installerException(sprintf('Another install in %s held the lock for 1 seconds.', $this->target)))
+        ->toThrow(installerException(sprintf('Another install in %s held the lock for 1 second. Run `cdp-browser install` again when the other install has ended, or raise the lock timeout (CDP_BROWSER_LOCK_TIMEOUT) above the duration of one install.', $this->target)))
         ->and(microtime(true) - $start)->toBeGreaterThanOrEqual(1.0)
         ->and($this->tools->calls('curl'))->toBe([]);
 
     $held->flock(LOCK_UN);
 
     expect(is_file(installBrowser($installer, $this->pin)))->toBeTrue();
+});
+
+it('waits for no lock with a lock timeout of 0, and names no wait', function (): void {
+    mkdir($this->target, 0o755, true);
+    $held = new SplFileObject($this->target.'/.lock', 'c');
+    $held->flock(LOCK_EX);
+
+    $installer = new Installer($this->tools->commandLine(), $this->directory.'/cache', musl: false, lockTimeout: 0);
+    $start = microtime(true);
+
+    expect(fn (): Binaries => $installer->install($this->pin, Platform::LinuxArm64))
+        ->toThrow(installerException(sprintf('Another install in %s holds the lock, and the lock timeout is 0. Run `cdp-browser install` again when the other install has ended, or raise the lock timeout (CDP_BROWSER_LOCK_TIMEOUT) above the duration of one install.', $this->target)))
+        ->and(microtime(true) - $start)->toBeLessThan(1.0)
+        ->and($this->tools->calls('curl'))->toBe([]);
 });
 
 it('pauses while it waits for the lock, and spends almost no CPU time', function (): void {
@@ -469,7 +483,7 @@ it('waits for the seconds of CDP_BROWSER_LOCK_TIMEOUT, and gives each tool those
     $start = microtime(true);
 
     expect(fn (): Binaries => $installer->install($this->pin, Platform::LinuxArm64))
-        ->toThrow(installerException(sprintf('Another install in %s held the lock for 1 seconds.', $this->target)))
+        ->toThrow(installerException(sprintf('Another install in %s held the lock for 1 second. Run `cdp-browser install` again when the other install has ended, or raise the lock timeout (CDP_BROWSER_LOCK_TIMEOUT) above the duration of one install.', $this->target)))
         ->and(microtime(true) - $start)->toBeGreaterThanOrEqual(1.0)->toBeLessThan(5.0);
 
     $held->flock(LOCK_UN);
@@ -521,7 +535,7 @@ it('takes a whole number of seconds above 0 for each timeout, and names any othe
     // The example of each message is the default of its variable.
     foreach ([Installer::TIMEOUT => 900, Installer::LOCK_TIMEOUT => 600] as $variable => $example) {
         expect(fn (): Installer => Installer::fromEnvironment(['HOME' => '/home/me', $variable => $value], $this->tools->commandLine(), musl: false))
-            ->toThrow(installerException(sprintf('%s `%s` is not a whole number of seconds above 0, such as %d.', $variable, $value, $example)));
+            ->toThrow(installerException(sprintf('%s `%s` is not a whole number of seconds above 0. Use digits only, such as %d.', $variable, $value, $example)));
     }
 })->with([
     'the notation of a float' => '1e3',
@@ -803,7 +817,7 @@ it('checks an empty archive that a cache restored, and deletes it with exit code
 
     expect(fn (): mixed => underErrorExceptions(fn (): Binaries => $this->installer->install($this->pin, Platform::LinuxArm64)))
         ->toThrow(checksumException(sprintf(
-            'The SHA-256 of %s is %s, the pin expects %s. The archive is deleted and was not unpacked.',
+            'The SHA-256 of %s is %s, but the pin expects %s. The archive is deleted and was not unpacked.',
             $archive,
             hash('sha256', ''),
             $this->pin->hash(Binary::ChromeHeadlessShell, Platform::LinuxArm64),
@@ -819,7 +833,7 @@ it('names an archive that it cannot read', function (): void {
     chmod($archive, 0o000);
 
     expect(fn (): mixed => underErrorExceptions(fn (): Binaries => $this->installer->install($this->pin, Platform::LinuxArm64)))
-        ->toThrow(installerException(sprintf('The archive %s could not be read.', $archive)));
+        ->toThrow(installerException(sprintf('The archive %s could not be read. Run `cdp-browser install` again: it downloads the archive again.', $archive)));
 })->skip(posix_geteuid() === 0, 'Root reads a file of mode 0000.');
 
 it('frees the lock when the install is killed, also while one of its tools runs', function (): void {
@@ -912,7 +926,7 @@ it('takes the cache directory from the environment', function (array $environmen
 it('needs a cache directory', function (array $environment): void {
     /** @var array<string, string> $environment */
     expect(fn (): string => Installer::cache($environment))
-        ->toThrow(installerException('Neither CDP_BROWSER_PATH, an absolute XDG_CACHE_HOME nor HOME is set, so there is no cache directory.'));
+        ->toThrow(installerException('Neither CDP_BROWSER_PATH, an absolute XDG_CACHE_HOME nor HOME is set, so there is no cache directory. Set CDP_BROWSER_PATH to an absolute path.'));
 })->with([
     'nothing' => [[]],
     'a relative XDG' => [['XDG_CACHE_HOME' => 'xdg']],
@@ -930,12 +944,12 @@ it('stops at the root as the cache, and at a `~` that no shell expanded', functi
 
 it('stops at a cache directory that unzip reads as a pattern, before it downloads', function (string $name): void {
     $cache = $this->directory.'/'.$name;
-    $message = sprintf('The cache directory %s/cdp-browser holds `*`, `?`, `[`, `]`, `\` or a line break, which unzip reads as a pattern or zipinfo prints as two lines. Use a path without them.', $cache);
+    $message = sprintf('The cache directory %s/cdp-browser contains `*`, `?`, `[`, `]`, `\` or a line break, which unzip reads as a pattern or zipinfo prints as two lines. Use a path without them.', $cache);
 
     expect(fn (): Binaries => Installer::fromEnvironment(['CDP_BROWSER_PATH' => $cache.'/cdp-browser'], $this->tools->commandLine(), musl: false)->install($this->pin, Platform::LinuxArm64))
         ->toThrow(installerException($message))
         ->and(fn (): string => Installer::cache(['XDG_CACHE_HOME' => $cache, 'HOME' => '/home/me']))->toThrow(installerException($message))
-        ->and(fn (): string => Installer::cache(['HOME' => $cache]))->toThrow(installerException(sprintf('The cache directory %s/.cache/cdp-browser holds', $cache)))
+        ->and(fn (): string => Installer::cache(['HOME' => $cache]))->toThrow(installerException(sprintf('The cache directory %s/.cache/cdp-browser contains', $cache)))
         ->and(fn (): Installer => new Installer($this->tools->commandLine(), $cache.'/cdp-browser'))->toThrow(installerException($message))
         ->and($this->tools->calls('curl'))->toBe([]);
 })->with(['cache[1]', 'cache*', 'cache?', 'cache]', 'cache\\x', "cache\nx"]);
@@ -944,7 +958,7 @@ it('stops at a cache directory behind a symbolic link to such a name, before it 
     mkdir($this->directory.'/real[1]');
     symlink($this->directory.'/real[1]', $this->directory.'/link');
     // safe-unzip resolves the path, as /var to /private/var on macOS.
-    $message = sprintf('The cache directory %s/real[1]/cache/cdp-browser holds `*`', realpath($this->directory));
+    $message = sprintf('The cache directory %s/real[1]/cache/cdp-browser contains `*`', realpath($this->directory));
 
     expect(fn (): Binaries => Installer::fromEnvironment(['CDP_BROWSER_PATH' => $this->directory.'/link/cache/cdp-browser'], $this->tools->commandLine(), musl: false)->install($this->pin, Platform::LinuxArm64))
         ->toThrow(installerException($message))
@@ -962,7 +976,7 @@ it('checks a cache directory outside of open_basedir, where realpath() resolves 
     );
 
     expect(php($code, settings: ['-d', 'open_basedir='.dirname(__DIR__, 2), '-d', 'max_execution_time=5']))->toBe([
-        "/srv/missing/cache\nThe cache directory /srv/missing/cache[1] holds `*`, `?`, `[`, `]`, `\\` or a line break, which unzip reads as a pattern or zipinfo prints as two lines. Use a path without them.",
+        "/srv/missing/cache\nThe cache directory /srv/missing/cache[1] contains `*`, `?`, `[`, `]`, `\\` or a line break, which unzip reads as a pattern or zipinfo prints as two lines. Use a path without them.",
         0,
     ]);
 });
