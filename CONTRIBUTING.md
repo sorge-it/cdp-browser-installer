@@ -1,6 +1,6 @@
 # Contributing
 
-Report a bug or request a feature with a pull request, not an issue: the repository has no issues.
+Report a bug or request a feature with a pull request: issues are turned off for this repository.
 A pull request with a failing test is enough, even without a fix. Vulnerabilities are the
 exception: report them privately, see [SECURITY.md](SECURITY.md).
 
@@ -41,11 +41,12 @@ with 2.3.6: raise the minimum of the plugin to that release, and `--memory-limit
 needs.
 
 To run mutation testing by hand: `vendor/bin/pest --mutate --everything --covered-only`, without
-`--parallel`. In Pest 5.3, `--parallel` counts every mutant as caught: 717 of 717 in 17 seconds,
-while a serial run of the same code found 24 untested and 3 timeouts. On 1.0.0, the serial run
-finds 17 untested and 3 timeouts of 731 mutants, in about 12 minutes in Docker. Pest's stream wrapper
-makes the tests of `flock()` and of unreadable files fail without any mutant, so a mutant there
-that counts as caught may have escaped: check it by hand.
+`--parallel`. Both measurements below are from 2026-11-02, the day of release 1.0.0. In Pest 5.3,
+`--parallel` counted every mutant as caught, 717 of 717 in 17 seconds, while a serial run of the
+same code found 24 untested and 3 timeouts. On release 1.0.0, the serial run found 17 untested and
+3 timeouts of 731 mutants, in about 12 minutes in Docker. Pest's stream wrapper makes the tests of `flock()` and
+of unreadable files fail without any mutant, so a mutant there that counts as caught may have
+escaped: check it by hand.
 
 The code must run on PHP 8.4, on Linux with glibc and musl, and on macOS. When a message or a step
 of the demo changes, record the demo again. Both commands need network access: `pin` downloads

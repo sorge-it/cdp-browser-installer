@@ -107,6 +107,11 @@ jobs:
       - name: symfony/panther
         run: php panther.php
 
+      # PantherTestCase starts the first chromedriver in PATH; the README's base class puts the
+      # pinned one first.
+      - name: symfony/panther · PantherTestCase
+        run: php vendor/bin/phpunit --bootstrap vendor/autoload.php --fail-on-empty-test-suite panther/WorksWithTest.php
+
       # Dusk runs in a Laravel app, as in a project: the newest skeleton with the newest Dusk and
       # this checkout, outside the checkout. No `dusk:install`: it downloads its own ChromeDriver.
       - name: Create a Laravel app for laravel/dusk
@@ -211,6 +216,9 @@ jobs:
 
       - name: symfony/panther
         run: docker exec --user tester --env GITHUB_STEP_SUMMARY alpine php panther.php
+
+      - name: symfony/panther · PantherTestCase
+        run: docker exec --user tester --env GITHUB_STEP_SUMMARY alpine php vendor/bin/phpunit --bootstrap vendor/autoload.php --fail-on-empty-test-suite panther/WorksWithTest.php
 
       - name: Create a Laravel app for laravel/dusk
         run: |
