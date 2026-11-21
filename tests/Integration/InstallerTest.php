@@ -16,7 +16,6 @@ use SorgeIt\CdpBrowserInstaller\Tests\FakeTools;
 use SorgeIt\SafeUnzip\Exception\InvalidArchiveException;
 use SorgeIt\SafeUnzip\Exception\RefusedException;
 use SorgeIt\SafeUnzip\Exception\ToolException;
-use SorgeIt\SafeUnzip\Exception\UnzipException;
 use SorgeIt\SafeUnzip\Profile\Reason as Rule;
 use Symfony\Component\Process\Process;
 
@@ -339,7 +338,7 @@ it('stops before it writes any entry when one entry leaves the target', function
         $name => ['evil', 0o100644],
     ])->bindTo($this))
         // The real zipinfo lists these names; the ListingTest of safe-unzip names the reason for each one.
-        ->toThrow(installerException('Nothing was unpacked.', UnzipException::class))
+        ->toThrow(unzipException(RefusedException::class))
         // The checked archive goes back to the cache. After the browser, chromedriver is not fetched.
         ->and(glob($this->target.'/*.zip'))->toBe(cachedArchives($this->target, $binary))
         ->and(file_exists($this->target.'/'.$binary->directory(Platform::LinuxArm64)))->toBeFalse()
@@ -353,18 +352,16 @@ it('stops before it writes any entry when one entry leaves the target', function
 ]);
 
 it('stops at a symbolic link', function (Binary $binary): void {
-    $link = $binary->directory(Platform::LinuxArm64).'/link';
-
     expect(installArchive($binary, [
         '{top}/{binary}' => [BROWSER, 0o100755],
         '{top}/link' => ['/etc/passwd', 0o120777],
     ])->bindTo($this))
-        ->toThrow(static function (InstallerException $exception) use ($link): void {
+        ->toThrow(static function (InstallerException $exception): void {
             $refused = $exception->getPrevious();
 
             expect($exception::class)->toBe(InstallerException::class)
-                ->and($exception->getMessage())->toContain(sprintf('N5 An entry is neither a file nor a directory: the archive entry `%s` is a symbolic link. Nothing was unpacked.', $link))
                 ->and($refused)->toBeInstanceOf(RefusedException::class)
+                ->and($exception->getMessage())->toBe($refused?->getMessage())
                 ->and($refused instanceof RefusedException ? $refused->reason : null)->toBe(Rule::EntryType);
         })
         ->and(glob($this->target.'/*.zip'))->toBe(cachedArchives($this->target, $binary))
@@ -390,7 +387,7 @@ it('stops at a file that is no ZIP archive', function (): void {
     $this->tools->serve(VERSION, Binary::ChromeHeadlessShell, Platform::LinuxArm64, $this->directory.'/none.zip');
 
     expect(fn (): Binaries => $this->installer->install(pinFor(VERSION, $this->directory.'/none.zip', $this->chromedriverArchive, Platform::LinuxArm64), Platform::LinuxArm64))
-        ->toThrow(installerException('is no ZIP archive: zipinfo finds no end record.', InvalidArchiveException::class));
+        ->toThrow(unzipException(InvalidArchiveException::class));
 });
 
 it('does not follow redirects, names a missing version, and leaves no file', function (int|string $status, string $class, string $message): void {
@@ -883,9 +880,12 @@ it('gives its timeout to zipinfo and unzip', function (string $tool): void {
     copy($this->archive, $this->target.'/chrome-headless-shell-linux-arm64.zip');
     $this->tools->add($tool, 'sleep(5);');
     $installer = new Installer($this->tools->commandLine(timeout: 1), $this->directory.'/cache', musl: false);
+    $started = microtime(true);
 
+    // The fake tool sleeps 5 seconds, so only the timeout of 1 second ends it before.
     expect(fn (): Binaries => $installer->install($this->pin, Platform::LinuxArm64))
-        ->toThrow(installerException(sprintf('`%s` stopped: it exceeded the timeout of 1 seconds.', $tool), ToolException::class));
+        ->toThrow(unzipException(ToolException::class))
+        ->and(microtime(true) - $started)->toBeLessThan(5.0);
 })->with(['zipinfo', 'unzip']);
 
 it('stops at a relative cache directory when the working directory is gone', function (): void {

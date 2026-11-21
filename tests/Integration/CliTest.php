@@ -312,7 +312,7 @@ it('writes no pin for an archive that install refuses', function (?array $entrie
         ->and(pinDirectories($this->tools))->toHaveCount(1)
         ->and(array_filter(pinDirectories($this->tools), file_exists(...)))->toBe([]);
 })->with([
-    'an error page with status 200' => [null, installerException('is no ZIP archive', InvalidArchiveException::class)],
+    'an error page with status 200' => [null, unzipException(InvalidArchiveException::class)],
     'an archive without the binary' => [['chrome-headless-shell-mac-x64/readme' => ['x', 0o100644]], installerException('does not contain chrome-headless-shell-mac-x64/chrome-headless-shell.')],
 ]);
 
