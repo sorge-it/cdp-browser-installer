@@ -28,10 +28,10 @@
         "ext-zip": "*",
         "laravel/pint": "^1.29",
         "pestphp/pest": "^5.3.5",
-        "pestphp/pest-plugin-type-coverage": "^5.0.3",
-        "phpstan/phpstan": "^2.3.4 <2.3.6",
+        "pestphp/pest-plugin-type-coverage": "^5.1.1",
+        "phpstan/phpstan": "^2.3.4",
         "phpunit/php-code-coverage": "^14.3",
-        "rector/rector": "^2.8.3"
+        "rector/rector": "^2.8.5"
     },
     "autoload": {
         "psr-4": {
@@ -54,7 +54,7 @@
             "@test:unit"
         ],
         "test:unit": "pest",
-        "test:types": "phpstan --memory-limit=160M",
+        "test:types": "phpstan --memory-limit=256M",
         "test:type-coverage": "@php -d memory_limit=1G vendor/bin/pest --type-coverage --min=100 --no-cache --configuration=phpunit.type-coverage.xml",
         "test:coverage": "@php -d memory_limit=1G vendor/bin/pest --coverage --min=100",
         "test:lint": [
