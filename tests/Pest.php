@@ -12,6 +12,7 @@ use SorgeIt\CdpBrowserInstaller\Pin;
 use SorgeIt\CdpBrowserInstaller\Platform;
 use SorgeIt\CdpBrowserInstaller\Tests\FakeTools;
 use SorgeIt\CdpBrowserInstaller\Tests\TestCase;
+use SorgeIt\SafeUnzip\Exception\UnzipException;
 use Symfony\Component\Process\Process;
 
 pest()->extend(TestCase::class)->in('Unit', 'Integration');
@@ -66,6 +67,22 @@ function downloadException(string $message = '', ?string $previous = null): Clos
 function checksumException(string $message = ''): Closure
 {
     return thrown(ChecksumException::class, $message);
+}
+
+/**
+ * For `toThrow()`: an InstallerException that passes on the message of an exception of
+ * safe-unzip. The text of that message belongs to safe-unzip and changes with its releases, so
+ * only the class is compared.
+ *
+ * @param  class-string<UnzipException>  $previous
+ */
+function unzipException(string $previous): Closure
+{
+    return static function (InstallerException $exception) use ($previous): void {
+        expect($exception::class)->toBe(InstallerException::class)
+            ->and($exception->getPrevious())->toBeInstanceOf($previous)
+            ->and($exception->getMessage())->toBe($exception->getPrevious()?->getMessage());
+    };
 }
 
 /**
