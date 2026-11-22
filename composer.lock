@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "af89dd6a00d7365067a3fdea562c285d",
+    "content-hash": "bba51709f52854be4fffdde68a512425",
     "packages": [
         {
             "name": "psr/container",
@@ -1096,16 +1096,16 @@
         },
         {
             "name": "entropy/entropy",
-            "version": "0.4.36",
+            "version": "0.4.37",
             "source": {
                 "type": "git",
                 "url": "https://github.com/TomasVotruba/entropy.git",
-                "reference": "9f08272a96275d22a9d9808a32581392920626db"
+                "reference": "57bd06e1652f3c38148944b4880ee3b6e6284da3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/TomasVotruba/entropy/zipball/9f08272a96275d22a9d9808a32581392920626db",
-                "reference": "9f08272a96275d22a9d9808a32581392920626db",
+                "url": "https://api.github.com/repos/TomasVotruba/entropy/zipball/57bd06e1652f3c38148944b4880ee3b6e6284da3",
+                "reference": "57bd06e1652f3c38148944b4880ee3b6e6284da3",
                 "shasum": ""
             },
             "require": {
@@ -1141,9 +1141,10 @@
             "description": "Entropy framework",
             "support": {
                 "issues": "https://github.com/TomasVotruba/entropy/issues",
-                "source": "https://github.com/TomasVotruba/entropy/tree/0.4.36"
+                "source": "https://github.com/TomasVotruba/entropy/tree/0.4.37"
             },
-            "time": "2026-10-26T16:46:17+00:00"
+            "time": "2026-11-14T16:57:42+00:00",
+            "published-time": "2026-11-14T16:57:58+00:00"
         },
         {
             "name": "fidry/cpu-core-counter",
@@ -1698,7 +1699,8 @@
                     "type": "patreon"
                 }
             ],
-            "time": "2026-04-12T12:06:31+00:00"
+            "time": "2026-04-12T12:06:31+00:00",
+            "published-time": "2026-04-12T12:07:55+00:00"
         },
         {
             "name": "nunomaduro/termwind",
@@ -1975,7 +1977,8 @@
                     "type": "patreon"
                 }
             ],
-            "time": "2026-07-18T17:10:45+00:00"
+            "time": "2026-07-18T17:10:45+00:00",
+            "published-time": "2026-07-28T14:33:43+00:00"
         },
         {
             "name": "pestphp/pest-plugin-arch",
@@ -2192,23 +2195,23 @@
         },
         {
             "name": "pestphp/pest-plugin-type-coverage",
-            "version": "v5.1.0",
+            "version": "v5.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/pestphp/pest-plugin-type-coverage.git",
-                "reference": "3951c85494cede417987c6418005b96e68e30e5b"
+                "reference": "0c1148106bc31d336606d62cc5930a885d8ad9c4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/pestphp/pest-plugin-type-coverage/zipball/3951c85494cede417987c6418005b96e68e30e5b",
-                "reference": "3951c85494cede417987c6418005b96e68e30e5b",
+                "url": "https://api.github.com/repos/pestphp/pest-plugin-type-coverage/zipball/0c1148106bc31d336606d62cc5930a885d8ad9c4",
+                "reference": "0c1148106bc31d336606d62cc5930a885d8ad9c4",
                 "shasum": ""
             },
             "require": {
                 "nunomaduro/pokio": "^1.0.1",
                 "pestphp/pest-plugin": "^5.0.0",
                 "php": "^8.4",
-                "phpstan/phpstan": "^2.3.4",
+                "phpstan/phpstan": "^2.3.5",
                 "tomasvotruba/type-coverage": "^2.5.1"
             },
             "conflict": {
@@ -2250,7 +2253,7 @@
                 "unit"
             ],
             "support": {
-                "source": "https://github.com/pestphp/pest-plugin-type-coverage/tree/v5.1.0"
+                "source": "https://github.com/pestphp/pest-plugin-type-coverage/tree/v5.1.1"
             },
             "funding": [
                 {
@@ -2262,7 +2265,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-30T09:08:01+00:00"
+            "time": "2026-11-16T20:01:45+00:00",
+            "published-time": "2026-11-16T20:03:08+00:00"
         },
         {
             "name": "phar-io/manifest",
@@ -2612,11 +2616,11 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "2.3.4",
+            "version": "2.3.7",
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/f20ce6f3c82556cfcfc086b152445a12d1d64fff",
-                "reference": "f20ce6f3c82556cfcfc086b152445a12d1d64fff",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/90c91c2498849ab8cc4e873864bbf1cb2bf6ea12",
+                "reference": "90c91c2498849ab8cc4e873864bbf1cb2bf6ea12",
                 "shasum": ""
             },
             "require": {
@@ -2672,7 +2676,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-28T22:38:53+00:00"
+            "time": "2026-11-19T10:31:11+00:00",
+            "published-time": "2026-11-19T10:31:27+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
@@ -3251,21 +3256,21 @@
         },
         {
             "name": "rector/rector",
-            "version": "2.8.3",
+            "version": "2.8.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/rectorphp/rector.git",
-                "reference": "12ddb68d34acb91bcf3d00302bf1c7c1b5840bd6"
+                "reference": "bf2982e3e2b8dfbcb43e5589fa301431cb1e479e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/rectorphp/rector/zipball/12ddb68d34acb91bcf3d00302bf1c7c1b5840bd6",
-                "reference": "12ddb68d34acb91bcf3d00302bf1c7c1b5840bd6",
+                "url": "https://api.github.com/repos/rectorphp/rector/zipball/bf2982e3e2b8dfbcb43e5589fa301431cb1e479e",
+                "reference": "bf2982e3e2b8dfbcb43e5589fa301431cb1e479e",
                 "shasum": ""
             },
             "require": {
                 "php": "^7.4|^8.0",
-                "phpstan/phpstan": "^2.3.4"
+                "phpstan/phpstan": "^2.3.5"
             },
             "conflict": {
                 "rector/rector-doctrine": "*",
@@ -3296,7 +3301,7 @@
             ],
             "support": {
                 "issues": "https://github.com/rectorphp/rector/issues",
-                "source": "https://github.com/rectorphp/rector/tree/2.8.3"
+                "source": "https://github.com/rectorphp/rector/tree/2.8.5"
             },
             "funding": [
                 {
@@ -3304,7 +3309,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-29T05:51:41+00:00"
+            "time": "2026-11-14T23:24:35+00:00",
+            "published-time": "2026-11-14T23:24:41+00:00"
         },
         {
             "name": "sebastian/cli-parser",
@@ -4614,7 +4620,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-09-25T15:50:05+00:00"
+            "time": "2026-09-25T15:50:05+00:00",
+            "published-time": "2026-09-30T10:23:35+00:00"
         },
         {
             "name": "ta-tikoma/phpunit-architecture-test",
@@ -4744,7 +4751,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-09T19:09:05+00:00"
+            "time": "2026-10-09T19:09:05+00:00",
+            "published-time": "2026-10-09T19:09:39+00:00"
         },
         {
             "name": "webmozart/assert",
@@ -4829,5 +4837,5 @@
     "platform-overrides": {
         "php": "8.4.1"
     },
-    "plugin-api-version": "2.9.0"
+    "plugin-api-version": "2.11.0"
 }
