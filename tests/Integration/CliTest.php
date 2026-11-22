@@ -83,7 +83,7 @@ it('installs the pair and prints the path of each binary', function (): void {
 
 it('names the install command when the pair is missing', function (): void {
     expect(fn () => $this->cli()->run(['command' => 'path', 'binary' => 'chromedriver', '--pin-file' => $this->pinFile]))
-        ->toThrow(installerException('chrome-headless-shell and chromedriver 155.0.8059.39 for linux64 are not installed. Run `cdp-browser install`.'));
+        ->toThrow(installerException(sprintf('chrome-headless-shell and chromedriver 155.0.8059.39 for linux64 are not installed. Run `vendor/bin/cdp-browser install --pin-file %s`.', $this->pinFile)));
 });
 
 it('prints no path of chromedriver when the tree of chrome-headless-shell is gone, and ends with exit code 1', function (): void {
@@ -97,14 +97,14 @@ it('prints no path of chromedriver when the tree of chrome-headless-shell is gon
 
     expect($tester->run(['command' => 'path', 'binary' => 'chromedriver', '--pin-file' => $this->pinFile], ['capture_stderr_separately' => true]))->toBe(1)
         ->and($tester->getDisplay())->toBe('')
-        ->and($tester->getErrorOutput())->toBe("chrome-headless-shell and chromedriver 155.0.8059.39 for linux64 are not installed. Run `cdp-browser install`.\n")
+        ->and($tester->getErrorOutput())->toBe(sprintf("chrome-headless-shell and chromedriver 155.0.8059.39 for linux64 are not installed. Run `vendor/bin/cdp-browser install --pin-file %s`.\n", $this->pinFile))
         ->and(is_executable($target.'/chromedriver-linux64/chromedriver'))->toBeTrue();
 });
 
 it('needs the name of a binary for path, and names both', function (array $input): void {
     /** @var array<string, string> $input */
     expect(fn () => $this->cli()->run(['command' => 'path', '--pin-file' => $this->pinFile, ...$input]))
-        ->toThrow(installerException('Name the binary: `cdp-browser path chrome-headless-shell` or `cdp-browser path chromedriver`.'));
+        ->toThrow(installerException('Name the binary: `vendor/bin/cdp-browser path chrome-headless-shell` or `vendor/bin/cdp-browser path chromedriver`.'));
 })->with([
     'no name' => [[]],
     'another name' => [['binary' => 'chrome']],
@@ -146,7 +146,7 @@ it('checks the version before it downloads', function (string $version): void {
     $tester = new CommandTester(new PinCommand(fn (): CommandLine => $this->tools->commandLine(), 1000));
 
     expect(fn (): int => $tester->execute(['version' => $version, '--pin-file' => $this->directory.'/pinned']))
-        ->toThrow(installerException(sprintf('`%s` is not a Chrome for Testing version. Use four numbers, such as 155.0.8059.39.', $version)))
+        ->toThrow(installerException(sprintf('`%s` is not a Chrome for Testing version. Use four numbers separated by dots, such as the Stable version on https://googlechromelabs.github.io/chrome-for-testing/.', $version)))
         ->and($this->tools->calls('curl'))->toBe([])
         ->and($tester->getDisplay())->toBe('');
 })->with([
@@ -344,7 +344,7 @@ it('writes no pin for a download whose MD5 differs from x-goog-hash, and keeps t
     $tester = new CommandTester(new PinCommand(fn (): CommandLine => $this->tools->commandLine(), 1000));
 
     expect(fn (): int => $tester->execute(['version' => '155.0.8059.39', '--pin-file' => $this->pinFile]))
-        ->toThrow(checksumException(sprintf('The MD5 of the download for chrome-headless-shell on %s is %s, but the storage sent %s in `x-goog-hash`. The download is broken; no pin was written. Run `cdp-browser pin 155.0.8059.39` again.', $platform->value, base64_encode((string) md5_file($archive, true)), $other)))
+        ->toThrow(checksumException(sprintf('The MD5 of the download for chrome-headless-shell on %s is %s, but the storage sent %s in `x-goog-hash`. The download is broken; no pin file was written. Run `vendor/bin/cdp-browser pin 155.0.8059.39` again.', $platform->value, base64_encode((string) md5_file($archive, true)), $other)))
         ->and(file_get_contents($this->pinFile))->toBe($old)
         ->and($this->tools->calls('curl'))->toHaveCount($downloads)
         ->and(pinDirectories($this->tools))->toHaveCount(1)
@@ -369,7 +369,7 @@ it('ends pin with exit code 1 and the message of the file system for a download 
     $exitCode = underErrorExceptions(fn (): int => $tester->run(['command' => 'pin', 'version' => '155.0.8059.39', '--pin-file' => $this->directory.'/pinned'], ['capture_stderr_separately' => true]));
 
     expect($exitCode)->toBe(1)
-        ->and($tester->getErrorOutput())->toMatch('~\AThe downloaded file '.preg_quote(sys_get_temp_dir().'/cdp-browser-pin-', '~').'[0-9a-f]{16}/archive\.zip could not be read; no pin was written\. Run `cdp-browser pin 155\.0\.8059\.39` again\.\n\z~')
+        ->and($tester->getErrorOutput())->toMatch('~\AThe downloaded file '.preg_quote(sys_get_temp_dir().'/cdp-browser-pin-', '~').'[0-9a-f]{16}/archive\.zip could not be read; no pin file was written\. Run `vendor/bin/cdp-browser pin 155\.0\.8059\.39` again\.\n\z~')
         ->and(file_exists($this->directory.'/pinned'))->toBeFalse()
         ->and(array_filter(pinDirectories($this->tools), file_exists(...)))->toBe([]);
 })->skip(posix_geteuid() === 0, 'Root reads a file of mode 0000.');
@@ -400,7 +400,7 @@ it('names a file of the download that it cannot read as a cause of the file syst
     [$output, $exitCode] = php($code);
 
     expect($exitCode)->toBe(0)
-        ->and($output)->toMatch('~\A'.preg_quote(InstallerException::class.': The downloaded file '.sys_get_temp_dir().'/cdp-browser-pin-', '~').'[0-9a-f]{16}/'.preg_quote($file, '~').' could not be read; no pin was written\. Run `cdp-browser pin 155\.0\.8059\.39` again\.\z~')
+        ->and($output)->toMatch('~\A'.preg_quote(InstallerException::class.': The downloaded file '.sys_get_temp_dir().'/cdp-browser-pin-', '~').'[0-9a-f]{16}/'.preg_quote($file, '~').' could not be read; no pin file was written\. Run `vendor/bin/cdp-browser pin 155\.0\.8059\.39` again\.\z~')
         ->and(file_exists($this->directory.'/pinned'))->toBeFalse()
         ->and($this->tools->calls('curl'))->toHaveCount(1)
         ->and(array_filter(pinDirectories($this->tools), file_exists(...)))->toBe([]);
@@ -638,16 +638,17 @@ it('starts the application from bin/cdp-browser with the environment of the proc
 });
 
 it('ends bin/cdp-browser with the message and exit code 1 when the command stops', function (): void {
-    // `pin` checks its argument first, so the message is the same on glibc and on musl.
-    $code = sprintf('$_SERVER["argv"] = ["cdp-browser", "pin", "1.2"]; require %s;', var_export(dirname(__DIR__, 2).'/bin/cdp-browser', true));
+    // `pin` checks its argument before the platform, so the message is the same on glibc and on
+    // musl. `--allow-root` gives the same message to a run as root, as in a container.
+    $code = sprintf('$_SERVER["argv"] = ["cdp-browser", "pin", "1.2", "--allow-root"]; require %s;', var_export(dirname(__DIR__, 2).'/bin/cdp-browser', true));
 
     expect(php($code, ['CDP_BROWSER_PATH' => $this->directory.'/cache']))
-        ->toBe(["`1.2` is not a Chrome for Testing version. Use four numbers, such as 155.0.8059.39.\n", 1]);
+        ->toBe(["`1.2` is not a Chrome for Testing version. Use four numbers separated by dots, such as the Stable version on https://googlechromelabs.github.io/chrome-for-testing/.\n", 1]);
 });
 
 it('prints only the message of an InstallerException on the error output, without file, line, usage or wrap, and ends with its exit code', function (array $input, string $message, int $exitCode): void {
     $this->tools->sendHeaders("HTTP/2 {status}\r\nx-goog-hash: md5=".base64_encode(md5('other', true))."\r\n\r\n", Platform::LinuxX64);
-    $application = Cli::application(['CDP_BROWSER_PATH' => $this->directory.'/cache'], 1000, static fn (): Platform => Platform::LinuxX64, $this->tools->commandLine(), musl: false);
+    $application = Cli::application(['CDP_BROWSER_PATH' => $this->directory.'/cache', Installer::LOCK_TIMEOUT => '1'], 1000, static fn (): Platform => Platform::LinuxX64, $this->tools->commandLine(), musl: false);
     $application->setAutoExit(false);
 
     $tester = new ApplicationTester($application);
@@ -658,12 +659,12 @@ it('prints only the message of an InstallerException on the error output, withou
 })->with([
     'an InstallerException' => [
         onTestCase(fn (): array => ['command' => 'path', 'binary' => 'chromedriver', '--pin-file' => $this->pinFile]),
-        'chrome-headless-shell and chromedriver 155.0.8059.39 for linux64 are not installed. Run `cdp-browser install`.',
+        onTestCase(fn (): string => sprintf('chrome-headless-shell and chromedriver 155.0.8059.39 for linux64 are not installed. Run `vendor/bin/cdp-browser install --pin-file %s`.', $this->pinFile)),
         1,
     ],
     'a ChecksumException' => [
         onTestCase(fn (): array => ['command' => 'pin', 'version' => '155.0.8059.39', '--pin-file' => $this->directory.'/pinned']),
-        onTestCase(fn (): string => sprintf('The MD5 of the download for chrome-headless-shell on linux64 is %s, but the storage sent %s in `x-goog-hash`. The download is broken; no pin was written. Run `cdp-browser pin 155.0.8059.39` again.', base64_encode((string) md5_file($this->archive, true)), base64_encode(md5('other', true)))),
+        onTestCase(fn (): string => sprintf('The MD5 of the download for chrome-headless-shell on linux64 is %s, but the storage sent %s in `x-goog-hash`. The download is broken; no pin file was written. Run `vendor/bin/cdp-browser pin 155.0.8059.39` again.', base64_encode((string) md5_file($this->archive, true)), base64_encode(md5('other', true)))),
         65,
     ],
     'a DownloadException' => [
@@ -675,14 +676,25 @@ it('prints only the message of an InstallerException on the error output, withou
         sprintf('%s responded with HTTP status 503.', Download::url('155.0.8059.39', Binary::ChromeHeadlessShell, Platform::LinuxX64)),
         75,
     ],
+    'a LockException' => [
+        onTestCase(function (): array {
+            mkdir($this->directory.'/cache/155.0.8059.39/linux64', 0o755, true);
+            $this->held = new SplFileObject($this->directory.'/cache/155.0.8059.39/linux64/.lock', 'c');
+            $this->held->flock(LOCK_EX);
+
+            return ['command' => 'install', '--pin-file' => $this->pinFile];
+        }),
+        onTestCase(fn (): string => sprintf('Another install in %s/cache/155.0.8059.39/linux64 held the lock for 1 second. Run `vendor/bin/cdp-browser install` again when the other install has ended, or raise the lock timeout (CDP_BROWSER_LOCK_TIMEOUT, or `$lockTimeout` of `Installer`) above the duration of one install.', $this->directory)),
+        75,
+    ],
     'a message with a tag of Symfony' => [
         onTestCase(fn (): array => ['command' => 'path', 'binary' => 'chromedriver', '--pin-file' => $this->directory.'/<info>pin</info>']),
-        onTestCase(fn (): string => sprintf('There is no pin file at %s/<info>pin</info>, seen from the working directory %s. Write one with `cdp-browser pin <version>`.', $this->directory, getcwd())),
+        onTestCase(fn (): string => sprintf('There is no pin file at %s/<info>pin</info>, seen from the working directory %s. Write one with `vendor/bin/cdp-browser pin VERSION --pin-file \'%1$s/<info>pin</info>\'`, with VERSION from https://googlechromelabs.github.io/chrome-for-testing/.', $this->directory, getcwd())),
         1,
     ],
     'with --quiet' => [
         onTestCase(fn (): array => ['command' => 'path', 'binary' => 'chromedriver', '--pin-file' => $this->pinFile, '--quiet' => true]),
-        'chrome-headless-shell and chromedriver 155.0.8059.39 for linux64 are not installed. Run `cdp-browser install`.',
+        onTestCase(fn (): string => sprintf('chrome-headless-shell and chromedriver 155.0.8059.39 for linux64 are not installed. Run `vendor/bin/cdp-browser install --pin-file %s`.', $this->pinFile)),
         1,
     ],
 ]);

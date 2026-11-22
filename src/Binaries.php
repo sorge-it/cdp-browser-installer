@@ -7,6 +7,8 @@ namespace SorgeIt\CdpBrowserInstaller;
 /**
  * The paths of the pair: the browser and the ChromeDriver of the same version. A test tool that
  * speaks CDP starts the browser; a WebDriver tool starts ChromeDriver and gives it the browser.
+ *
+ * @api
  */
 final readonly class Binaries
 {

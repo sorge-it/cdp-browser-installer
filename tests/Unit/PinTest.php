@@ -49,7 +49,7 @@ it('needs a valid SHA-256 of each binary for every platform', function (?string 
     }
 
     expect(fn (): Pin => new Pin('155.0.8059.39', $hashes))
-        ->toThrow(installerException('The pin of 155.0.8059.39 has no valid SHA-256 of chromedriver for mac-arm64.'));
+        ->toThrow(installerException('The pin file for 155.0.8059.39 has no valid SHA-256 of chromedriver for mac-arm64.'));
 })->with([
     'missing' => [null],
     'too short' => ['abc'],
@@ -68,8 +68,10 @@ it('needs a version of four numbers', function (string $version): void {
 ]);
 
 it('names the pin command when the file is missing', function (): void {
-    expect(fn (): Pin => Pin::read(temporaryDirectory().'/.chrome-version'))
-        ->toThrow(installerException('Write one with `cdp-browser pin <version>`.'));
+    $file = temporaryDirectory().'/.chrome-version';
+
+    expect(fn (): Pin => Pin::read($file))
+        ->toThrow(installerException(sprintf('Write one with `vendor/bin/cdp-browser pin VERSION --pin-file %s`, with VERSION from https://googlechromelabs.github.io/chrome-for-testing/.', $file)));
 });
 
 it('stops at a file that is no pin', function (string $content, string $message): void {
@@ -86,7 +88,7 @@ it('stops at a file that is no pin', function (string $content, string $message)
     ['{"version": "155.0.8059.39", "chrome-headless-shell": {}, "chromedriver": "a"}', 'needs `version`, `chrome-headless-shell` and `chromedriver`'],
     ['{"chrome-headless-shell": {}, "chromedriver": {}}', 'needs `version`, `chrome-headless-shell` and `chromedriver`'],
     // A hash that is no text counts as missing.
-    [json_encode(['version' => '155.0.8059.39', 'chrome-headless-shell' => ['linux64' => 1] + hashes()['chrome-headless-shell'], 'chromedriver' => hashes()['chromedriver']]), 'The pin of 155.0.8059.39 has no valid SHA-256 of chrome-headless-shell for linux64.'],
+    [json_encode(['version' => '155.0.8059.39', 'chrome-headless-shell' => ['linux64' => 1] + hashes()['chrome-headless-shell'], 'chromedriver' => hashes()['chromedriver']]), 'The pin file for 155.0.8059.39 has no valid SHA-256 of chrome-headless-shell for linux64.'],
 ]);
 
 it('names the command that writes a pin of version 1 again', function (): void {
@@ -94,9 +96,15 @@ it('names the command that writes a pin of version 1 again', function (): void {
     file_put_contents($file, json_encode(['version' => '155.0.8059.39', 'sha256' => hashes()['chrome-headless-shell']]));
 
     expect(fn (): Pin => Pin::read($file))->toThrow(installerException(sprintf(
-        'The pin file %s pins chrome-headless-shell only, in the format of release 1.x. Write it again with `cdp-browser pin 155.0.8059.39`: it pins chrome-headless-shell and chromedriver.',
+        'The pin file %1$s pins chrome-headless-shell only, in the format of release 1.x. Write it again with `vendor/bin/cdp-browser pin 155.0.8059.39 --pin-file %1$s`: it pins chrome-headless-shell and chromedriver.',
         $file,
     )));
+});
+
+it('names the option of a pin file other than the default, and quotes a path for the shell where it needs it', function (): void {
+    expect(Pin::option(Pin::FILE))->toBe('')
+        ->and(Pin::option('tests/pin-1.json'))->toBe(' --pin-file tests/pin-1.json')
+        ->and(Pin::option('my pins/.chrome-version'))->toBe(" --pin-file 'my pins/.chrome-version'");
 });
 
 it('checks the version of a pin of version 1 before its message names it', function (): void {

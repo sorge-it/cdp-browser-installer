@@ -15,6 +15,7 @@ RUN apt-get update \
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
 # The home of the user of the host, who has no entry in /etc/passwd: the default cache is in it.
-RUN mkdir -m 1777 /home/demo
+# /ci holds the cache of demo.tape, a short path that keeps the refusal in the GIF readable.
+RUN mkdir -m 1777 /home/demo /ci
 
 ENTRYPOINT []

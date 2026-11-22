@@ -100,12 +100,12 @@ it('starts the browser for dmore/chrome-mink-driver as the command line of the R
     preg_match_all('/ (--[a-z-]+=?[0-9]*)/', $lines[0], $shown);
     preg_match_all("/'(--[a-z-]+=?[0-9]*)/", $script, $started);
 
-    // --no-sandbox depends on the system, so the README names it in its text, not in the command.
+    // Both add --no-sandbox on Linux only: the README through uname, the script through PHP_OS_FAMILY.
     expect($commands)->toHaveCount(1)
         ->and($lines[1] ?? '')->toEndWith(' http://127.0.0.1:9222/json/version')
         ->and($commands[0])->toStartWith('"$(vendor/bin/cdp-browser path chrome-headless-shell)" ')
+        ->and($lines[0])->toEndWith(' $([ "$(uname)" = Linux ] && echo --no-sandbox) &')
         ->and($script)->toContain("exec('vendor/bin/cdp-browser path chrome-headless-shell'")
-        ->and($shown[1])->toBe(['--headless', '--remote-debugging-port=9222', '--user-data-dir='])
-        ->and($started[1])->toBe([...$shown[1], '--no-sandbox'])
-        ->and($section)->toContain('`--no-sandbox`');
+        ->and($shown[1])->toBe(['--headless', '--remote-debugging-port=9222', '--user-data-dir=', '--no-sandbox'])
+        ->and($started[1])->toBe($shown[1]);
 });

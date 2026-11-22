@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 // The demo of the README: pin, install, path, a page through the browser, and a changed archive
-// of a cache that install refuses. Run through `make -C demo record`, in demo/app, with a network.
+// of a cache that install refuses. Run through `make -C demo record`, in demo/app in the container,
+// with a network.
 
 use SorgeIt\CdpBrowserInstaller\Binary;
 use SorgeIt\CdpBrowserInstaller\Platform;
@@ -33,7 +34,9 @@ $steps = [
     ['vendor/bin/cdp-browser install', 0],
     ['"$(vendor/bin/cdp-browser path chrome-headless-shell)" --version', 0],
     ['"$(vendor/bin/cdp-browser path chromedriver)" --version', 0],
-    ['"$(vendor/bin/cdp-browser path chrome-headless-shell)" --dump-dom \'data:text/html,<p>ok</p>\'', 0],
+    // The command of the README. In the container, Chrome finds no D-Bus and logs each attempt to
+    // stderr; the step shows that it drops stderr.
+    ['"$(vendor/bin/cdp-browser path chrome-headless-shell)" --headless $([ "$(uname)" = Linux ] && echo --no-sandbox) --dump-dom \'data:text/html,<p>ok</p>\' 2>/dev/null', 0],
     // As on a new CI runner: a cache restored the archives, and the pair is missing.
     [sprintf('rm -rf %1$s/*/ %1$s/.sha256-pair', $pair), 0],
     ['printf x >> '.$archive, 0],
@@ -47,7 +50,8 @@ foreach ($steps as [$step, $expected]) {
     printf("\n$ %s\n", $step);
     $start = microtime(true);
     $output = [];
-    exec($step.' 2>&1', $output, $code);
+    // In braces: a redirect of the step itself wins over the 2>&1 of all steps.
+    exec('{ '.$step.'; } 2>&1', $output, $code);
 
     foreach ($output as $line) {
         echo str_replace($directory.'/', './', $line), "\n";

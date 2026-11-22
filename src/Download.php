@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SorgeIt\CdpBrowserInstaller;
 
+use Symfony\Component\Process\Exception\ProcessFailedException;
+
 /**
  * Downloads an archive of Chrome for Testing with `curl`, from one source only.
  *
@@ -66,9 +68,17 @@ final readonly class Download
             ]);
         } catch (InstallerException $installerException) {
             $this->remove($file);
-
             // The cause of the stop, such as the timeout of Symfony, not a second exception of the installer.
-            throw new DownloadException(sprintf('The download of %s stopped. %s', $url, $installerException->getMessage()), $installerException->getPrevious());
+            $previous = $installerException->getPrevious();
+            $message = sprintf('The download of %s stopped. %s', $url, $installerException->getMessage());
+
+            // curl cannot write the archive (23), does not trust a certificate (60), stops above `--max-filesize` (63),
+            // or cannot read its CA certificates (77): a retry does not help.
+            if ($previous instanceof ProcessFailedException && in_array($previous->getProcess()->getExitCode(), [23, 60, 63, 77], true)) {
+                throw new InstallerException($message, $previous);
+            }
+
+            throw new DownloadException($message, $previous);
         }
 
         if ($status === '200') {

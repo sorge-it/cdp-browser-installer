@@ -14,6 +14,8 @@ use Throwable;
  * Puts the pair of chrome-headless-shell and chromedriver under `<cache>/<version>/<platform>/`,
  * or uses the system's pair. Each archive stays beside its tree. Its SHA-256 is checked
  * before it is unpacked.
+ *
+ * @api
  */
 final readonly class Installer
 {
@@ -51,7 +53,7 @@ final readonly class Installer
     /**
      * The seconds after which a leftover counts as one of a stopped run; curl stops below 1 KiB/s
      * for 60 s. Without a working `flock()`, a second run can remove a file of a run whose step
-     * takes longer; that run then stops with exit code 1.
+     * takes longer; that run then stops.
      */
     private const int STOPPED = 120;
 
@@ -60,7 +62,11 @@ final readonly class Installer
     /**
      * The next step for an archive that cannot be read: the run removes its file of the archive.
      */
-    private const string READ_AGAIN = 'Run `cdp-browser install` again: it downloads the archive again.';
+    private const string READ_AGAIN = 'Run `vendor/bin/cdp-browser install` again: it downloads the archive again.';
+
+    private const string CACHED_BYTES = 'It came from the cache: run `vendor/bin/cdp-browser install` again to download it.';
+
+    private const string NEW_BYTES = 'It was a new download: do not pin these bytes; find out why, see https://github.com/sorge-it/cdp-browser-installer/security/policy.';
 
     private ?string $cache;
 
@@ -280,9 +286,15 @@ final readonly class Installer
      */
     private function move(string $from, string $to): void
     {
-        if (! Files::quietly(static fn (): bool => rename($from, $to))) {
-            throw new InstallerException(sprintf('%s could not be moved to %s.%s', $from, $to, file_exists($from) ? '' : ' Another install removed it, which happens where flock() does not lock, as on some shared file systems. Run `cdp-browser install` again.'));
+        if (Files::quietly(static fn (): bool => rename($from, $to))) {
+            return;
         }
+
+        if (file_exists($from)) {
+            throw new InstallerException(sprintf('%s could not be moved to %s.', $from, $to));
+        }
+
+        throw new LockException(sprintf('%s could not be moved to %s. Another install removed it, which happens where `flock()` does not lock, as on some shared file systems. Run `vendor/bin/cdp-browser install` again.', $from, $to));
     }
 
     /**
@@ -296,12 +308,13 @@ final readonly class Installer
     {
         $archive = $directory.'/'.$binary->directory($platform).'.zip';
         $own = $archive.'.part-'.bin2hex(random_bytes(4));
+        $downloaded = false;
 
         try {
             // A second run without a working lock removes a `.part-*` file by its age, and a rename
             // keeps the old age of a file that a cache restored. So the time is set before the rename.
             if (is_file($archive) && ! Files::quietly(static fn (): bool => touch($archive))) {
-                throw new InstallerException(sprintf('The modification time of the cached archive %s could not be updated. Remove the archive; the next `cdp-browser install` downloads it again.', $archive));
+                throw new InstallerException(sprintf('The modification time of the cached archive %s could not be updated. Remove the archive; the next `vendor/bin/cdp-browser install` downloads it again.', $archive));
             }
 
             // Without an archive in the cache, or when another run took it first, this run downloads.
@@ -315,9 +328,10 @@ final readonly class Installer
                 }
 
                 new Download($this->commandLine)->to($pin->version, $binary, $platform, $own);
+                $downloaded = true;
             }
 
-            $this->verify($own, $archive, $pin->hash($binary, $platform));
+            $this->verify($own, $archive, $pin->hash($binary, $platform), $downloaded);
 
             try {
                 $this->unpack($own, $binary, $directory, $pin, $platform);
@@ -397,7 +411,7 @@ final readonly class Installer
                     ? sprintf('Another install in %s holds the lock, and the lock timeout is 0.', $directory)
                     : sprintf('Another install in %s held the lock for %d %s.', $directory, $this->lockTimeout, $this->lockTimeout === 1 ? 'second' : 'seconds');
 
-                throw new InstallerException(sprintf('%s Run `cdp-browser install` again when the other install has ended, or raise the lock timeout (%s) above the duration of one install.', $cause, self::LOCK_TIMEOUT));
+                throw new LockException(sprintf('%s Run `vendor/bin/cdp-browser install` again when the other install has ended, or raise the lock timeout (%s, or `$lockTimeout` of `Installer`) above the duration of one install.', $cause, self::LOCK_TIMEOUT));
             }
 
             usleep(200_000);
@@ -408,9 +422,10 @@ final readonly class Installer
 
     /**
      * Checks the file of this run. The message names the archive of the cache, which the file
-     * came from or would have become; `installArchive()` removes the file.
+     * came from or would have become; `installArchive()` removes the file. For an archive from the
+     * cache, the message names a new download as the next step; a new pin never helps.
      */
-    private function verify(string $file, string $archive, string $expected): void
+    private function verify(string $file, string $archive, string $expected, bool $downloaded): void
     {
         $handle = Files::quietly(static fn (): mixed => fopen($file, 'rb'));
 
@@ -436,7 +451,13 @@ final readonly class Installer
         $actual = hash_final($context);
 
         if ($actual !== $expected) {
-            throw new ChecksumException(sprintf('The SHA-256 of %s is %s, but the pin expects %s. The archive is deleted and was not unpacked.', $archive, $actual, $expected));
+            throw new ChecksumException(sprintf(
+                'The SHA-256 of %s is %s, but the pin file expects %s. The archive is deleted and was not unpacked. %s',
+                $archive,
+                $actual,
+                $expected,
+                $downloaded ? self::NEW_BYTES : self::CACHED_BYTES,
+            ));
         }
     }
 
@@ -457,7 +478,7 @@ final readonly class Installer
             Files::makeDirectory($temporary);
             new Unpack($this->commandLine)->to($archive, $binary, $platform, $temporary);
 
-            // Where flock() does not exclude, another run may have moved in the same pair while
+            // Where flock() does not lock, another run may have moved in the same pair while
             // this one unpacked. A test may run it already, so it stays, and this tree goes.
             if ($this->isInstalled($pin, $platform)) {
                 return;
@@ -471,7 +492,7 @@ final readonly class Installer
                 throw new InstallerException(sprintf('The stamp in %s could not be removed.', $directory));
             }
 
-            // Where flock() does not exclude, another run moves the same paths. It moves in only a
+            // Where flock() does not lock, another run moves the same paths. It moves in only a
             // tree of the checked archive, so a path that it moved counts as moved.
             if (is_dir($target) && ! Files::quietly(static fn (): bool => rename($target, $old)) && file_exists($target)) {
                 throw new InstallerException(sprintf('%s could not be moved to %s.', $target, $old));

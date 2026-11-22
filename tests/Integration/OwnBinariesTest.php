@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 use SorgeIt\CdpBrowserInstaller\Binaries;
 use SorgeIt\CdpBrowserInstaller\Binary;
+use SorgeIt\CdpBrowserInstaller\DownloadException;
 use SorgeIt\CdpBrowserInstaller\Installer;
 use SorgeIt\CdpBrowserInstaller\InstallerException;
 use SorgeIt\CdpBrowserInstaller\Platform;
 use SorgeIt\CdpBrowserInstaller\SystemLibraries;
 use SorgeIt\CdpBrowserInstaller\Tests\FakeTools;
+use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 
 beforeEach(function (): void {
@@ -34,15 +36,15 @@ it('downloads nothing on musl, and names the two steps before it reads the pin f
     assert(is_string($file));
 
     expect(fn (): int => $this->cli([], musl: true)->run(['--pin-file' => $file, ...$input]))
-        ->toThrow(installerException("Chrome for Testing is built against glibc and does not start on musl, as on Alpine. Install the system's pair (`cdp-browser deps` runs `apk add chromium chromium-chromedriver`), then set CDP_BROWSER_CHROME to the browser, such as /usr/bin/chromium, and CDP_BROWSER_CHROMEDRIVER to ChromeDriver, such as /usr/bin/chromedriver."))
+        ->toThrow(installerException("Chrome for Testing is built against glibc and does not start on musl, as on Alpine. Install the system's pair (`vendor/bin/cdp-browser deps` runs `apk add chromium chromium-chromedriver`), then set CDP_BROWSER_CHROME to the browser, such as /usr/bin/chromium, and CDP_BROWSER_CHROMEDRIVER to ChromeDriver, such as /usr/bin/chromedriver."))
         ->and($this->tools->calls('curl'))->toBe([]);
 })->with([
     'install' => [['command' => 'install']],
-    // Not "Run `cdp-browser install`": install refuses there too.
+    // Not "Run `vendor/bin/cdp-browser install`": install refuses there too.
     'path' => [['command' => 'path', 'binary' => 'chromedriver']],
 ])->with([
     'a pin file' => [onTestCase(fn (): string => $this->pinFile)],
-    // Not "Write one with `cdp-browser pin`": install refuses after it.
+    // Not "Write one with `vendor/bin/cdp-browser pin`": install refuses after it.
     'no pin file' => [onTestCase(fn (): string => $this->directory.'/missing')],
     'a pin file of release 1.x' => [onTestCase(function (): string {
         file_put_contents($this->pinFile, json_encode(['version' => '155.0.8059.39', 'sha256' => ['linux64' => str_repeat('a', 64)]]));
@@ -149,7 +151,7 @@ it('needs an absolute path to a program that answers --version, for each binary'
 
 dataset('system binaries that install refuses', [
     'relative browser' => [Binary::ChromeHeadlessShell, 'chromium', 'CDP_BROWSER_CHROME must be an absolute path, not `chromium`.'],
-    // Not "`cdp-browser deps` installs it": deps installs nothing at a path of the caller's choice.
+    // Not "`vendor/bin/cdp-browser deps` installs it": deps installs nothing at a path of the caller's choice.
     'missing browser' => [Binary::ChromeHeadlessShell, '/nowhere/chromium', 'CDP_BROWSER_CHROME `/nowhere/chromium` is not an executable file. Set CDP_BROWSER_CHROME to the path of an existing binary, such as /usr/bin/chromium.'],
     'a directory as the browser' => [Binary::ChromeHeadlessShell, '/', 'CDP_BROWSER_CHROME `/` is not an executable file.'],
     'a browser that is not executable' => [Binary::ChromeHeadlessShell, '{file}', 'CDP_BROWSER_CHROME `{file}` is not an executable file.'],
@@ -179,10 +181,12 @@ it('stops at a binary that fails on --version', function (Binary $binary, string
 
     expect(fn (): Binaries => $installer->binaries($this->pinFile, Platform::LinuxX64))
         ->toThrow(static function (InstallerException $exception) use ($binary, $failing): void {
-            // An exit code has no exception behind it.
+            $previous = $exception->getPrevious();
+
             expect($exception::class)->toBe(InstallerException::class)
                 ->and($exception->getMessage())->toContain(sprintf('%1$s `%2$s` does not respond to `--version`. `%2$s` stopped with exit code 1', $binary->variable(), $failing))
-                ->and($exception->getPrevious())->toBeNull();
+                ->and($previous)->toBeInstanceOf(ProcessFailedException::class)
+                ->and($previous instanceof ProcessFailedException ? $previous->getProcess()->getExitCode() : null)->toBe(1);
         })
         ->and($this->tools->calls($tool.'-failing'))->toBe(['--version']);
 })->with([
@@ -209,4 +213,22 @@ it("installs Alpine's chromium and chromium-chromedriver through apk as root, an
         ->and(SystemLibraries::APK)->toContain('chromium', 'chromium-chromedriver')
         ->and($this->tools->calls('apt-get'))->toBe([])
         ->and($tester->getDisplay())->toEndWith("The packages are installed. Set CDP_BROWSER_CHROME to /usr/bin/chromium and CDP_BROWSER_CHROMEDRIVER to /usr/bin/chromedriver; `install` then uses this pair.\n");
+});
+
+it('runs the example under Use from PHP as the README shows it, and catches each exception with exit code 75 for its retry', function (): void {
+    $root = dirname(__DIR__, 2);
+    preg_match('/^## Use from PHP\n\n```php\n(.*?)^```$/ms', (string) file_get_contents($root.'/README.md'), $example);
+    $code = $example[1] ?? '';
+    $autoload = "\nrequire __DIR__.'/vendor/autoload.php';\n";
+    preg_match('/\} catch \(([\w|]+)\) \{/', $code, $retry);
+    $caught = array_map(static fn (string $class): string => 'SorgeIt\CdpBrowserInstaller\\'.$class, explode('|', $retry[1] ?? ''));
+    $classes = array_map(static fn (string $file): string => 'SorgeIt\CdpBrowserInstaller\\'.basename($file, '.php'), glob($root.'/src/*Exception.php') ?: []);
+    $environment = ownPair($this->tools);
+
+    expect($code)->toStartWith("<?php\n\nuse ")
+        ->and($code)->toContain($autoload)
+        ->and($caught)->toEqualCanonicalizing(array_values(array_filter($classes, static fn (string $class): bool => constant($class.'::EXIT_CODE') === DownloadException::EXIT_CODE)))
+        // The autoloader of `php()` stands in for the one of the project.
+        ->and(php(str_replace(["<?php\n", $autoload], '', $code).'echo $browser, "\n", $chromedriver, "\n";', $environment))
+        ->toBe([$environment[Installer::OWN_CHROME]."\n".$environment[Installer::OWN_CHROMEDRIVER]."\n", 0]);
 });

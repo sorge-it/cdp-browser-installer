@@ -8,9 +8,9 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Each error of the package; the message names the cause and the next step. Two subclasses name
- * the archive: `DownloadException` and `ChecksumException`. For each other cause, a human fixes
- * it. An exception of safe-unzip, Symfony or PHP behind it is its previous exception.
+ * The base class of each exception of the package. A retry can help after `DownloadException` and
+ * `LockException`. `ChecksumException` means the bytes are not the expected ones. A human fixes any
+ * other cause. The cause from safe-unzip, Symfony or PHP is the previous exception.
  *
  * @api
  */

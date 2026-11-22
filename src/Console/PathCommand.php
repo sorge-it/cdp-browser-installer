@@ -51,7 +51,7 @@ final class PathCommand extends Command
         $binary = is_string($name) ? Binary::tryFrom($name) : null;
 
         if (! $binary instanceof Binary) {
-            throw new InstallerException('Name the binary: `cdp-browser path chrome-headless-shell` or `cdp-browser path chromedriver`.');
+            throw new InstallerException('Name the binary: `vendor/bin/cdp-browser path chrome-headless-shell` or `vendor/bin/cdp-browser path chromedriver`.');
         }
 
         $installer = ($this->installer)();
@@ -65,8 +65,8 @@ final class PathCommand extends Command
             return self::SUCCESS;
         }
 
-        // The message of `install`: on musl, "Run `cdp-browser install`" or "Write one with
-        // `cdp-browser pin`" leads to its refusal.
+        // The message of `install`: on musl, "Run `vendor/bin/cdp-browser install`" or "Write one with
+        // `vendor/bin/cdp-browser pin`" leads to its refusal.
         if ($installer->onMusl()) {
             throw new InstallerException(Libc::REFUSAL);
         }
@@ -74,7 +74,7 @@ final class PathCommand extends Command
         $pin = Pin::read($pinFile);
 
         if (! $installer->isInstalled($pin, $platform)) {
-            throw new InstallerException(sprintf('chrome-headless-shell and chromedriver %s for %s are not installed. Run `cdp-browser install`.', $pin->version, $platform->value));
+            throw new InstallerException(sprintf('chrome-headless-shell and chromedriver %s for %s are not installed. Run `vendor/bin/cdp-browser install%s`.', $pin->version, $platform->value, Pin::option($pinFile)));
         }
 
         $output->writeln($installer->paths($pin, $platform)->path($binary));
