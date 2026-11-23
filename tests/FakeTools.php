@@ -66,6 +66,15 @@ final readonly class FakeTools
             if (is_file($root.'/delay')) {
                 usleep(1000 * (int) file_get_contents($root.'/delay'));
             }
+            // The first call that finds the file `hold-curl` waits while it exists. It goes on
+            // after the 60 s of the timeout of the fakes, or when the install is gone (parent 1).
+            if (is_file($root.'/hold-curl') && @mkdir($root.'/held-curl')) {
+                $deadline = microtime(true) + 60;
+                while (is_file($root.'/hold-curl') && microtime(true) < $deadline && posix_getppid() !== 1) {
+                    usleep(10_000);
+                    clearstatcache();
+                }
+            }
             echo $status;
             PHP, var_export(Download::SOURCE, true)));
         $this->packageManager('apt-get', 'echo "apt-get {$argv[1]}\n";');
