@@ -10,6 +10,7 @@ use SorgeIt\CdpBrowserInstaller\DownloadException;
 use SorgeIt\CdpBrowserInstaller\Installer;
 use SorgeIt\CdpBrowserInstaller\InstallerException;
 use SorgeIt\CdpBrowserInstaller\Libc;
+use SorgeIt\CdpBrowserInstaller\LockException;
 use SorgeIt\CdpBrowserInstaller\Pin;
 use SorgeIt\CdpBrowserInstaller\Platform;
 use SorgeIt\CdpBrowserInstaller\Tests\FakeTools;
@@ -17,6 +18,7 @@ use SorgeIt\SafeUnzip\Exception\InvalidArchiveException;
 use SorgeIt\SafeUnzip\Exception\RefusedException;
 use SorgeIt\SafeUnzip\Exception\ToolException;
 use SorgeIt\SafeUnzip\Profile\Reason as Rule;
+use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 
 const VERSION = '155.0.8059.39';
@@ -130,7 +132,7 @@ it('stops at a wrong SHA-256 of chromedriver after it unpacked the browser, and 
 
     expect(fn (): Binaries => $this->installer->install($changed, Platform::LinuxArm64))
         ->toThrow(checksumException(sprintf(
-            'The SHA-256 of %s/chromedriver-linux-arm64.zip is %s, but the pin expects %s. The archive is deleted and was not unpacked.',
+            'The SHA-256 of %s/chromedriver-linux-arm64.zip is %s, but the pin file expects %s. The archive is deleted and was not unpacked. It was a new download: do not pin these bytes; find out why, see https://github.com/sorge-it/cdp-browser-installer/security/policy.',
             $this->target,
             hash_file('sha256', $this->chromedriverArchive),
             $changed->hash(Binary::Chromedriver, Platform::LinuxArm64),
@@ -258,7 +260,7 @@ it('stops and deletes the archive when its SHA-256 differs from the pin', functi
     // The download is checked before it takes the place of the archive.
     expect(fn (): Binaries => $this->installer->install($changed, Platform::LinuxArm64))
         ->toThrow(checksumException(sprintf(
-            'The SHA-256 of %s/chrome-headless-shell-linux-arm64.zip is %s, but the pin expects %s. The archive is deleted and was not unpacked.',
+            'The SHA-256 of %s/chrome-headless-shell-linux-arm64.zip is %s, but the pin file expects %s. The archive is deleted and was not unpacked. It was a new download: do not pin these bytes; find out why, see https://github.com/sorge-it/cdp-browser-installer/security/policy.',
             $this->target,
             hash_file('sha256', $this->archive),
             $changed->hash(Binary::ChromeHeadlessShell, Platform::LinuxArm64),
@@ -411,6 +413,27 @@ it('does not follow redirects, names a missing version, and leaves no file', fun
     'curl fails' => ['fail', DownloadException::class, 'The download of %s stopped. `curl` stopped with exit code 6: curl: (6) Could not resolve host'],
 ]);
 
+it('ends a download with an InstallerException where a retry does not help, and keeps the exit code of curl', function (int $code, string $error): void {
+    $this->tools->add('curl', sprintf('fwrite(STDERR, %s); exit(%d);', var_export($error."\n", true), $code));
+    $url = Download::url(VERSION, Binary::ChromeHeadlessShell, Platform::LinuxArm64);
+
+    expect(fn (): Binaries => $this->installer->install($this->pin, Platform::LinuxArm64))
+        ->toThrow(static function (InstallerException $exception) use ($code, $error, $url): void {
+            $previous = $exception->getPrevious();
+
+            expect($exception::class)->toBe(InstallerException::class)
+                ->and($exception->getMessage())->toBe(sprintf('The download of %s stopped. `curl` stopped with exit code %d: %s', $url, $code, $error))
+                ->and($previous)->toBeInstanceOf(ProcessFailedException::class)
+                ->and($previous instanceof ProcessFailedException ? $previous->getProcess()->getExitCode() : null)->toBe($code);
+        })
+        ->and(scandir($this->target))->toBe(['.', '..', '.lock']);
+})->with([
+    'an archive that curl cannot write' => [23, 'curl: (23) Failure writing output to destination'],
+    'a certificate that curl does not trust' => [60, 'curl: (60) SSL certificate problem: unable to get local issuer certificate'],
+    'an archive above the limit' => [63, 'curl: (63) Maximum file size exceeded'],
+    'CA certificates that curl cannot read' => [77, 'curl: (77) error setting certificate verify locations'],
+]);
+
 it('waits for another install in the same directory, and gives up after its timeout', function (): void {
     mkdir($this->target, 0o755, true);
     $held = new SplFileObject($this->target.'/.lock', 'c');
@@ -421,7 +444,7 @@ it('waits for another install in the same directory, and gives up after its time
 
     // flock() locks an open file, so a second open file of the same process waits too.
     expect(fn (): Binaries => $installer->install($this->pin, Platform::LinuxArm64))
-        ->toThrow(installerException(sprintf('Another install in %s held the lock for 1 second. Run `cdp-browser install` again when the other install has ended, or raise the lock timeout (CDP_BROWSER_LOCK_TIMEOUT) above the duration of one install.', $this->target)))
+        ->toThrow(lockException(sprintf('Another install in %s held the lock for 1 second. Run `vendor/bin/cdp-browser install` again when the other install has ended, or raise the lock timeout (CDP_BROWSER_LOCK_TIMEOUT, or `$lockTimeout` of `Installer`) above the duration of one install.', $this->target)))
         ->and(microtime(true) - $start)->toBeGreaterThanOrEqual(1.0)
         ->and($this->tools->calls('curl'))->toBe([]);
 
@@ -439,7 +462,7 @@ it('waits for no lock with a lock timeout of 0, and names no wait', function ():
     $start = microtime(true);
 
     expect(fn (): Binaries => $installer->install($this->pin, Platform::LinuxArm64))
-        ->toThrow(installerException(sprintf('Another install in %s holds the lock, and the lock timeout is 0. Run `cdp-browser install` again when the other install has ended, or raise the lock timeout (CDP_BROWSER_LOCK_TIMEOUT) above the duration of one install.', $this->target)))
+        ->toThrow(lockException(sprintf('Another install in %s holds the lock, and the lock timeout is 0. Run `vendor/bin/cdp-browser install` again when the other install has ended, or raise the lock timeout (CDP_BROWSER_LOCK_TIMEOUT, or `$lockTimeout` of `Installer`) above the duration of one install.', $this->target)))
         ->and(microtime(true) - $start)->toBeLessThan(1.0)
         ->and($this->tools->calls('curl'))->toBe([]);
 });
@@ -466,7 +489,7 @@ it('pauses while it waits for the lock, and spends almost no CPU time', function
     $held->flock(LOCK_UN);
     [$class, $seconds] = explode(' ', $output) + ['', ''];
 
-    expect($class)->toBe(InstallerException::class)
+    expect($class)->toBe(LockException::class)
         ->and((float) $seconds)->toBeLessThan(0.5);
 });
 
@@ -480,7 +503,7 @@ it('waits for the seconds of CDP_BROWSER_LOCK_TIMEOUT, and gives each tool those
     $start = microtime(true);
 
     expect(fn (): Binaries => $installer->install($this->pin, Platform::LinuxArm64))
-        ->toThrow(installerException(sprintf('Another install in %s held the lock for 1 second. Run `cdp-browser install` again when the other install has ended, or raise the lock timeout (CDP_BROWSER_LOCK_TIMEOUT) above the duration of one install.', $this->target)))
+        ->toThrow(lockException(sprintf('Another install in %s held the lock for 1 second. Run `vendor/bin/cdp-browser install` again when the other install has ended, or raise the lock timeout (CDP_BROWSER_LOCK_TIMEOUT, or `$lockTimeout` of `Installer`) above the duration of one install.', $this->target)))
         ->and(microtime(true) - $start)->toBeGreaterThanOrEqual(1.0)->toBeLessThan(5.0);
 
     $held->flock(LOCK_UN);
@@ -814,7 +837,7 @@ it('checks an empty archive that a cache restored, and deletes it with exit code
 
     expect(fn (): mixed => underErrorExceptions(fn (): Binaries => $this->installer->install($this->pin, Platform::LinuxArm64)))
         ->toThrow(checksumException(sprintf(
-            'The SHA-256 of %s is %s, but the pin expects %s. The archive is deleted and was not unpacked.',
+            'The SHA-256 of %s is %s, but the pin file expects %s. The archive is deleted and was not unpacked. It came from the cache: run `vendor/bin/cdp-browser install` again to download it.',
             $archive,
             hash('sha256', ''),
             $this->pin->hash(Binary::ChromeHeadlessShell, Platform::LinuxArm64),
@@ -830,7 +853,7 @@ it('names an archive that it cannot read', function (): void {
     chmod($archive, 0o000);
 
     expect(fn (): mixed => underErrorExceptions(fn (): Binaries => $this->installer->install($this->pin, Platform::LinuxArm64)))
-        ->toThrow(installerException(sprintf('The archive %s could not be read. Run `cdp-browser install` again: it downloads the archive again.', $archive)));
+        ->toThrow(installerException(sprintf('The archive %s could not be read. Run `vendor/bin/cdp-browser install` again: it downloads the archive again.', $archive)));
 })->skip(posix_geteuid() === 0, 'Root reads a file of mode 0000.');
 
 it('frees the lock when the install is killed, also while one of its tools runs', function (): void {

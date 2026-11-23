@@ -7,6 +7,8 @@ namespace SorgeIt\CdpBrowserInstaller;
 /**
  * The platforms of Chrome for Testing that the installer supports. The value is the name that
  * Chrome for Testing uses in its download paths.
+ *
+ * @api
  */
 enum Platform: string
 {

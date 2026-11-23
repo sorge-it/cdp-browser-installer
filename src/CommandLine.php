@@ -6,6 +6,8 @@ namespace SorgeIt\CdpBrowserInstaller;
 
 use Closure;
 use Symfony\Component\Process\Exception\ExceptionInterface;
+use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 use Throwable;
 
@@ -13,6 +15,8 @@ use Throwable;
  * Starts every native tool of the installer from an argument list, never from a shell string.
  * The constructor is API: a caller gives each tool more variables, such as a `PATH`, and a
  * timeout.
+ *
+ * @api
  */
 final readonly class CommandLine
 {
@@ -60,14 +64,17 @@ final readonly class CommandLine
             } : null);
         } catch (ExceptionInterface $exception) {
             // A timeout or a signal: the same kind of error as an exit code, for every caller.
-            throw new InstallerException(sprintf('`%s` stopped: %s', $name, $exception->getMessage()), $exception);
+            $next = $exception instanceof ProcessTimedOutException ? ' Run the command again, or raise the tool timeout (CDP_BROWSER_TIMEOUT, or `$timeout` of `CommandLine`).' : '';
+
+            throw new InstallerException(sprintf('`%s` stopped: %s%s', $name, $exception->getMessage(), $next), $exception);
         }
 
         if (! $process->isSuccessful()) {
             // A tool that writes no error output ends the sentence without a colon.
             $error = trim($process->getErrorOutput());
 
-            throw new InstallerException(sprintf('`%s` stopped with exit code %d%s', $name, $process->getExitCode(), $error === '' ? '.' : ': '.$error));
+            // The exit code as a value, for a caller that decides by it, such as the download.
+            throw new InstallerException(sprintf('`%s` stopped with exit code %d%s', $name, $process->getExitCode(), $error === '' ? '.' : ': '.$error), new ProcessFailedException($process));
         }
 
         return $process->getOutput();

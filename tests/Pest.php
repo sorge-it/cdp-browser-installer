@@ -8,6 +8,7 @@ use SorgeIt\CdpBrowserInstaller\Binary;
 use SorgeIt\CdpBrowserInstaller\ChecksumException;
 use SorgeIt\CdpBrowserInstaller\DownloadException;
 use SorgeIt\CdpBrowserInstaller\InstallerException;
+use SorgeIt\CdpBrowserInstaller\LockException;
 use SorgeIt\CdpBrowserInstaller\Pin;
 use SorgeIt\CdpBrowserInstaller\Platform;
 use SorgeIt\CdpBrowserInstaller\Tests\FakeTools;
@@ -67,6 +68,11 @@ function downloadException(string $message = '', ?string $previous = null): Clos
 function checksumException(string $message = ''): Closure
 {
     return thrown(ChecksumException::class, $message);
+}
+
+function lockException(string $message = ''): Closure
+{
+    return thrown(LockException::class, $message);
 }
 
 /**

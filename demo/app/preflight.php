@@ -8,15 +8,19 @@ declare(strict_types=1);
 
 use SorgeIt\CdpBrowserInstaller\Binary;
 use SorgeIt\CdpBrowserInstaller\Download;
+use SorgeIt\CdpBrowserInstaller\Pin;
 use SorgeIt\CdpBrowserInstaller\Platform;
 use SorgeIt\CdpBrowserInstaller\SystemLibraries;
 
 require __DIR__.'/vendor/autoload.php';
 
 const VERSION = '158.0.8127.36';
-const HASH = '([0-9a-f]{64})';
+const CACHE = '/ci/cdp-browser';
+// The columns of the terminal that the width of demo.tape gives, and the width of its prompt `app ❯ `.
+const COLUMNS = 90;
+const PROMPT = 6;
 
-$pair = getenv('HOME').'/.cache/cdp-browser/'.VERSION.'/linux-arm64';
+$pair = CACHE.'/'.VERSION.'/linux-arm64';
 $tree = preg_quote($pair.'/chrome-headless-shell-linux-arm64', '/');
 $driver = preg_quote($pair.'/chromedriver-linux-arm64', '/');
 $version = preg_quote(VERSION, '/');
@@ -32,64 +36,76 @@ foreach (SystemLibraries::APT as $package) {
     }
 }
 
-// The whole output of each command, as a regular expression. {pin} is the hash that the first
-// command shows.
+$installed = "chrome-headless-shell for linux-arm64 is at {$tree}\\/chrome-headless-shell\\.\nchromedriver for linux-arm64 is at {$driver}\\/chromedriver\\.";
+$pin = preg_quote(Pin::read(Pin::FILE)->hash(Binary::ChromeHeadlessShell, Platform::LinuxArm64), '/');
+
+// Each command of demo.tape in its order, with its exit code and its whole output as a regular
+// expression. The exit code 65 is that of a ChecksumException.
 $expected = [
-    'grep -e version -e chrome -e linux-arm64 .chrome-version' => "    \"version\": \"{$version}\",\n    \"chrome-headless-shell\": {\n        \"linux-arm64\": \"".HASH."\",\n    \"chromedriver\": {\n        \"linux-arm64\": \"[0-9a-f]{64}\",",
-    'vendor/bin/cdp-browser install' => $download(Binary::ChromeHeadlessShell)."\n".$download(Binary::Chromedriver)
-        ."\nchrome-headless-shell for linux-arm64 is at {$tree}\\/chrome-headless-shell\\.\nchromedriver for linux-arm64 is at {$driver}\\/chromedriver\\.",
-    '"$(vendor/bin/cdp-browser path chrome-headless-shell)" --version' => "Google Chrome for Testing {$version}",
-    '"$(vendor/bin/cdp-browser path chromedriver)" --version' => "ChromeDriver {$version} \\(.+\\)",
-    '# The archive as a CI cache restores it, with one byte added' => '',
-    'dir=~/.cache/cdp-browser/'.VERSION.'/linux-arm64' => '',
-    'rm -r $dir/*/ $dir/.sha256-pair' => '',
-    'printf x >> $dir/chrome-headless-shell-linux-arm64.zip' => '',
-    // ls shows the archive of chromedriver only: the changed archive is gone, and nothing is unpacked.
-    'vendor/bin/cdp-browser install; ls $dir' => "The SHA-256 of {$tree}\\.zip is [0-9a-f]{64}, but the pin expects {pin}\\. The archive is deleted and was not unpacked\\.\nchromedriver-linux-arm64\\.zip",
+    ['export CDP_BROWSER_PATH='.CACHE, 0, ''],
+    ['vendor/bin/cdp-browser install', 0, $download(Binary::ChromeHeadlessShell)."\n".$download(Binary::Chromedriver)."\n".$installed],
+    ['"$(vendor/bin/cdp-browser path chrome-headless-shell)" --version', 0, "Google Chrome for Testing {$version}"],
+    ['"$(vendor/bin/cdp-browser path chromedriver)" --version', 0, "ChromeDriver {$version} \\(.+\\)"],
+    ['dir='.CACHE.'/'.VERSION.'/linux-arm64', 0, ''],
+    ['rm -r $dir/*/ $dir/.sha256-pair', 0, ''],
+    ['printf x >> $dir/chrome-headless-shell-linux-arm64.zip', 0, ''],
+    ['vendor/bin/cdp-browser install', 65, "The SHA-256 of {$tree}\\.zip is [0-9a-f]{64}, but the pin file expects {$pin}\\. The archive is deleted and was not unpacked\\. It came from the cache: run `vendor\\/bin\\/cdp-browser install` again to download it\\."],
+    // Only the deleted archive is downloaded again; the one of chromedriver comes from the cache.
+    ['vendor/bin/cdp-browser install', 0, $download(Binary::ChromeHeadlessShell)."\n".$installed],
 ];
 
-// The commands whose output the GIF shows: each `Type`, without the setup of the shell and `clear`.
-// The pin file is typed hidden, so that the first frame shows its output.
+// The commands whose output the GIF shows: each `Type`, without the prompt of the shell and the
+// captions, which start with `clear`.
 $commands = [];
 
 foreach (file(__DIR__.'/../demo.tape', FILE_IGNORE_NEW_LINES) ?: [] as $line) {
     if (str_starts_with($line, 'Type') && preg_match('/\AType (["\'])(.*)\1\z/', $line, $type) !== 1) {
         // Another form, such as Type@500ms or a string in backticks: this preflight cannot read it.
         $failures[] = sprintf('The line `%s` of demo.tape is not a form this preflight reads.', $line);
-    } elseif (isset($type[2]) && $type[2] !== 'clear' && ! str_starts_with($type[2], 'export PS1=')) {
+    } elseif (isset($type[2]) && ! str_starts_with($type[2], 'clear') && ! str_starts_with($type[2], 'export PS1=')) {
         $commands[] = $type[2];
     }
 
     unset($type);
 }
 
-if (array_diff(array_keys($expected), $commands) !== []) {
-    $failures[] = sprintf('demo.tape no longer types: %s', implode(' · ', array_diff(array_keys($expected), $commands)));
+if ($commands !== array_column($expected, 0)) {
+    $failures[] = sprintf("demo.tape types:\n%s\nThe preflight expects:\n%s", implode("\n", $commands), implode("\n", array_column($expected, 0)));
 }
 
-exec('rm -rf ~/.cache/cdp-browser');
+exec('rm -rf '.CACHE);
 // An assignment of the tape stays set for the next commands, as in the shell of the recording.
 $assignments = '';
-$pin = 'none';
 
-foreach ($commands as $command) {
-    if (! array_key_exists($command, $expected)) {
-        $failures[] = sprintf('The command `%s` of demo.tape has no expected output here.', $command);
-
-        continue;
-    }
-
+foreach ($expected as [$command, $exit, $pattern]) {
     $output = [];
     exec('bash -c '.escapeshellarg($assignments.$command).' 2>&1', $output, $code);
     $output = implode("\n", $output);
 
-    if ($code !== 0 || preg_match('/\A'.str_replace('{pin}', $pin, $expected[$command]).'\z/', $output, $match) !== 1) {
-        $failures[] = sprintf("The command `%s` ended with exit code %d and printed:\n%s", $command, $code, $output);
-    } elseif (isset($match[1])) {
-        $pin = $match[1];
+    if ($code !== $exit || preg_match('/\A'.$pattern.'\z/', $output) !== 1) {
+        $failures[] = sprintf("The command `%s` ended with exit code %d, not %d, or printed other text:\n%s", $command, $code, $exit, $output);
     }
 
-    if (preg_match('/\A\w+=\S+\z/', $command) === 1) {
+    if (PROMPT + strlen($command) > COLUMNS) {
+        $failures[] = sprintf('The command `%s` does not fit in one row of %d columns after the prompt.', $command, COLUMNS);
+    }
+
+    // The refusal is the peak of the GIF: a row of the terminal ends inside the archive path or at a
+    // space, never in a hash or in the command in backticks.
+    $path = [strpos($output, ' of ') + 4, strpos($output, ' is ')];
+    $quoted = [strpos($output, '`'), strrpos($output, '`') + 1];
+
+    for ($column = COLUMNS; $exit !== 0 && $column < strlen($output); $column += COLUMNS) {
+        $inPath = $column > $path[0] && $column < $path[1];
+        $atSpace = $output[$column - 1] === ' ' || $output[$column] === ' ';
+        $inQuote = $column > $quoted[0] && $column < $quoted[1];
+
+        if (! $inPath && (! $atSpace || $inQuote)) {
+            $failures[] = sprintf('The output of `%s` wraps at column %d in a word, a hash or a command: change the width of demo.tape and COLUMNS.', $command, $column);
+        }
+    }
+
+    if (preg_match('/\A(export )?\w+=\S+\z/', $command) === 1) {
         $assignments .= $command."\n";
     }
 }

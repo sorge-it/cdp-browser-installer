@@ -10,6 +10,7 @@ use SorgeIt\CdpBrowserInstaller\Console\PinCommand;
 use SorgeIt\CdpBrowserInstaller\DownloadException;
 use SorgeIt\CdpBrowserInstaller\Installer;
 use SorgeIt\CdpBrowserInstaller\InstallerException;
+use SorgeIt\CdpBrowserInstaller\LockException;
 use SorgeIt\CdpBrowserInstaller\Pin;
 use SorgeIt\CdpBrowserInstaller\Platform;
 use SorgeIt\CdpBrowserInstaller\Tests\FakeTools;
@@ -35,7 +36,7 @@ beforeEach(function (): void {
     $this->target = $this->directory.'/cache/155.0.8059.39/linux-arm64';
 });
 
-it('throws an InstallerException, and no subclass, for each cause but the download and the SHA-256', function (Closure $cause): void {
+it('throws an InstallerException, and no subclass, for each cause but the download, the SHA-256 and the lock', function (Closure $cause): void {
     expect(fn (): mixed => underErrorExceptions(fn (): mixed => $cause->call($this)))->toThrow(installerException());
 })->with([
     'a timeout below 0' => [fn (): Installer => Installer::fromEnvironment([Installer::TIMEOUT => '-1', 'HOME' => '/home/me'], musl: false)],
@@ -66,13 +67,6 @@ it('throws an InstallerException, and no subclass, for each cause but the downlo
         touch($this->directory.'/cache');
 
         return $this->installer->install($this->pin, Platform::LinuxArm64);
-    })],
-    'a lock that another install holds' => [onTestCase(function (): Binaries {
-        mkdir($this->target, 0o755, true);
-        $held = new SplFileObject($this->target.'/.lock', 'c');
-        $held->flock(LOCK_EX);
-
-        return new Installer($this->tools->commandLine(), $this->directory.'/cache', musl: false, lockTimeout: 0)->install($this->pin, Platform::LinuxArm64);
     })],
     'a pair that is not installed' => [onTestCase(fn (): int => $this->cli(platform: Platform::LinuxArm64)->run(['command' => 'path', 'binary' => 'chrome-headless-shell', '--pin-file' => $this->pinFile]))],
     // The source answers with status 404; a retry does not help.
@@ -159,10 +153,10 @@ it('names the step for a missing tool of install, by the package manager that de
         ->and($this->tools->calls('apk'))->toBe([])
         ->and($this->tools->calls('apt-get'))->toBe([]);
 })->with(['curl', 'unzip', 'zipinfo'])->with([
-    'apt-get, as on Debian and Ubuntu' => [['apt-get'], 'Run `cdp-browser deps` as root: it installs curl and unzip through apt.'],
+    'apt-get, as on Debian and Ubuntu' => [['apt-get'], 'Run `vendor/bin/cdp-browser deps` as root: it installs curl and unzip through apt.'],
     // Through apk, deps installs Alpine's pair, which `install` uses without curl or unzip; `pin` needs both.
-    'apk, as on Alpine' => [['apk'], 'Run `apk add curl unzip` as root: through apk, `cdp-browser deps` installs neither.'],
-    'apk beside apt-get, as deps takes apk first' => [['apt-get', 'apk'], 'Run `apk add curl unzip` as root: through apk, `cdp-browser deps` installs neither.'],
+    'apk, as on Alpine' => [['apk'], 'Run `apk add curl unzip` as root: through apk, `vendor/bin/cdp-browser deps` installs neither.'],
+    'apk beside apt-get, as deps takes apk first' => [['apt-get', 'apk'], 'Run `apk add curl unzip` as root: through apk, `vendor/bin/cdp-browser deps` installs neither.'],
     'neither, as on macOS' => [[], "Install curl and unzip with the system's package manager."],
 ]);
 
@@ -225,5 +219,6 @@ it('names an exception of the installer with the exception behind it', function 
 it('gives each exception class its exit code as its code', function (): void {
     expect(new InstallerException('x')->getCode())->toBe(InstallerException::EXIT_CODE)->toBe(1)
         ->and(new DownloadException('x')->getCode())->toBe(DownloadException::EXIT_CODE)->toBe(75)
-        ->and(new ChecksumException('x')->getCode())->toBe(ChecksumException::EXIT_CODE)->toBe(65);
+        ->and(new ChecksumException('x')->getCode())->toBe(ChecksumException::EXIT_CODE)->toBe(65)
+        ->and(new LockException('x')->getCode())->toBe(LockException::EXIT_CODE)->toBe(75);
 });

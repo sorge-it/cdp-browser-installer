@@ -5,6 +5,7 @@ declare(strict_types=1);
 use SorgeIt\CdpBrowserInstaller\Binary;
 use SorgeIt\CdpBrowserInstaller\CommandLine;
 use SorgeIt\CdpBrowserInstaller\Download;
+use SorgeIt\CdpBrowserInstaller\DownloadException;
 use SorgeIt\CdpBrowserInstaller\Installer;
 use SorgeIt\CdpBrowserInstaller\InstallerException;
 use SorgeIt\CdpBrowserInstaller\Platform;
@@ -163,7 +164,18 @@ it('reports a timeout of curl as an error of the download, and leaves no file', 
 
     expect(fn () => new Download($this->tools->commandLine(timeout: 1))->to('155.0.8059.39', Binary::Chromedriver, Platform::LinuxX64, $this->directory.'/out.zip'))
         ->toThrow(downloadException('`curl` stopped: The process', ProcessTimedOutException::class))
+        ->toThrow(downloadException('exceeded the timeout of 1 seconds. Run the command again, or raise the tool timeout (CDP_BROWSER_TIMEOUT, or `$timeout` of `CommandLine`).'))
         ->and(file_exists($this->directory.'/out.zip'))->toBeFalse();
+});
+
+it('names no timeout when a signal stops a tool', function (): void {
+    // 9 is SIGKILL; the constant needs ext-pcntl, which the tests do not require.
+    $this->tools->add('curl', 'posix_kill(getmypid(), 9);');
+
+    expect(fn () => new Download($this->tools->commandLine(timeout: 5))->to('155.0.8059.39', Binary::Chromedriver, Platform::LinuxX64, $this->directory.'/out.zip'))
+        ->toThrow(static function (DownloadException $exception): void {
+            expect($exception->getMessage())->toEndWith('`curl` stopped: The process has been signaled with signal "9".');
+        });
 });
 
 it('streams the output as it arrives, and gives the same locale to every tool', function (): void {

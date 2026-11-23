@@ -9,6 +9,7 @@ use SorgeIt\CdpBrowserInstaller\Console\Cli;
 use SorgeIt\CdpBrowserInstaller\Installer;
 use SorgeIt\CdpBrowserInstaller\Pin;
 use SorgeIt\CdpBrowserInstaller\Platform;
+use SplFileObject;
 use Symfony\Component\Console\Tester\ApplicationTester;
 
 /**
@@ -36,6 +37,9 @@ abstract class TestCase extends BaseTestCase
 
     /** The directory of the pair for the version and the platform. */
     public string $target;
+
+    /** A lock that the test holds while the command under test runs. */
+    public SplFileObject $held;
 
     /**
      * The application of `bin/cdp-browser`, with the cache below the directory of the test and

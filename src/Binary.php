@@ -8,6 +8,8 @@ namespace SorgeIt\CdpBrowserInstaller;
  * The two binaries of one version of Chrome for Testing that the installer pins and installs as
  * a pair: the browser and the WebDriver server of the same build. The value is the name that
  * Chrome for Testing uses for the archive and for the binary in it.
+ *
+ * @api
  */
 enum Binary: string
 {

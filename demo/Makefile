@@ -1,6 +1,6 @@
-# Records the GIF of the README and the social preview in Docker: no local PHP and no VHS needed.
-# `make -C demo all` from the root of the package; needs a network. `make -C demo record` writes
-# the text of the demo on this machine.
+# Records the GIF of the README, the social preview and the text demo in Docker: no local PHP and
+# no VHS needed. `make -C demo all` and `make -C demo record` from the root of the package; both
+# need a network.
 
 .DEFAULT_GOAL := help
 
@@ -43,13 +43,11 @@ png: preflight ## Record output/social.png
 
 all: gif png ## Record both
 
-# On this machine, not in Docker: in a container, Chrome finds no sandbox and the page of the demo
-# fails. Needs PHP 8.4, Composer, curl and unzip. A failed step leaves output/demo.txt as it was:
-# the output goes to a file of its own first.
-record: clean ## Run app/demo.php on this machine and write its output to output/demo.txt
-	cd app && composer install --no-interaction --no-progress -q
+# demo.php pins itself, after `clean`. A failed step leaves output/demo.txt as it was: the output
+# goes to a file of its own first.
+record: clean build ## Run app/demo.php in Docker and write its output to output/demo.txt
 	mkdir -p $(dir $(OUTPUT))
-	cd app && php demo.php > $(OUTPUT).part; status=$$?; cat $(OUTPUT).part; \
+	$(RUN) sh -c '$(COMPOSER) && php demo.php' > $(OUTPUT).part; status=$$?; cat $(OUTPUT).part; \
 		if [ $$status -ne 0 ]; then rm -f $(OUTPUT).part; exit 1; fi; mv $(OUTPUT).part $(OUTPUT)
 
 clean: ## Remove the installed demo app, its pin file and its caches

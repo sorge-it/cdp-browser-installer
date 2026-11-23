@@ -105,8 +105,8 @@ final readonly class SystemLibraries
             }
 
             $step = match ($this->manager()) {
-                'apk' => sprintf('Run `apk add %s` as root: through apk, `cdp-browser deps` installs neither.', implode(' ', self::TOOLS)),
-                'apt-get' => sprintf('Run `cdp-browser deps` as root: it installs %s through apt.', implode(' and ', self::TOOLS)),
+                'apk' => sprintf('Run `apk add %s` as root: through apk, `vendor/bin/cdp-browser deps` installs neither.', implode(' ', self::TOOLS)),
+                'apt-get' => sprintf('Run `vendor/bin/cdp-browser deps` as root: it installs %s through apt.', implode(' and ', self::TOOLS)),
                 null => sprintf("Install %s with the system's package manager.", implode(' and ', self::TOOLS)),
             };
 

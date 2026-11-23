@@ -8,6 +8,7 @@ use SorgeIt\CdpBrowserInstaller\CommandLine;
 use SorgeIt\CdpBrowserInstaller\Files;
 use SorgeIt\CdpBrowserInstaller\Installer;
 use SorgeIt\CdpBrowserInstaller\InstallerException;
+use SorgeIt\CdpBrowserInstaller\LockException;
 use SorgeIt\CdpBrowserInstaller\Pin;
 use SorgeIt\CdpBrowserInstaller\Platform;
 use SorgeIt\CdpBrowserInstaller\Tests\FakeTools;
@@ -78,7 +79,7 @@ it('names an archive of the cache whose modification time it cannot set, and the
 
     $output = installWithFunctions($this->directory, $this->tools, $this->pin, FAILING_TOUCH);
 
-    expect($output)->toBe(sprintf('%s: The modification time of the cached archive %s/chrome-headless-shell-linux-arm64.zip could not be updated. Remove the archive; the next `cdp-browser install` downloads it again.', InstallerException::class, $this->target))
+    expect($output)->toBe(sprintf('%s: The modification time of the cached archive %s/chrome-headless-shell-linux-arm64.zip could not be updated. Remove the archive; the next `vendor/bin/cdp-browser install` downloads it again.', InstallerException::class, $this->target))
         // No `.part-*` file with the old time of the archive.
         ->and(scandir($this->target))->toBe(['.', '..', '.lock', 'chrome-headless-shell-linux-arm64.zip']);
 });
@@ -90,8 +91,8 @@ it('names the next step when another install removed its archive during the unpa
 
     expect(fn (): mixed => underErrorExceptions(fn (): Binaries => $this->installer->install($this->pin, Platform::LinuxArm64)))
         ->toThrow(static function (InstallerException $exception): void {
-            expect($exception::class)->toBe(InstallerException::class)
-                ->and($exception->getMessage())->toMatch('~\A\S+/linux-arm64/chrome-headless-shell-linux-arm64\.zip\.part-[0-9a-f]{8} could not be moved to \S+/linux-arm64/chrome-headless-shell-linux-arm64\.zip\. Another install removed it, which happens where flock\(\) does not lock, as on some shared file systems\. Run `cdp-browser install` again\.\z~');
+            expect($exception::class)->toBe(LockException::class)
+                ->and($exception->getMessage())->toMatch('~\A\S+/linux-arm64/chrome-headless-shell-linux-arm64\.zip\.part-[0-9a-f]{8} could not be moved to \S+/linux-arm64/chrome-headless-shell-linux-arm64\.zip\. Another install removed it, which happens where `flock\(\)` does not lock, as on some shared file systems\. Run `vendor/bin/cdp-browser install` again\.\z~');
         })
         // No stamp: the next run unpacks the pair again.
         ->and(scandir($this->target))->toBe(['.', '..', '.lock', 'chrome-headless-shell-linux-arm64']);
@@ -107,7 +108,7 @@ it('names an archive that it cannot read to the end, and hashes no part of it', 
         }
         PHP);
 
-    expect($output)->toBe(sprintf('%s: The archive %s/chrome-headless-shell-linux-arm64.zip could not be read. Run `cdp-browser install` again: it downloads the archive again.', InstallerException::class, $this->target))
+    expect($output)->toBe(sprintf('%s: The archive %s/chrome-headless-shell-linux-arm64.zip could not be read. Run `vendor/bin/cdp-browser install` again: it downloads the archive again.', InstallerException::class, $this->target))
         ->and(scandir($this->target))->toBe(['.', '..', '.lock']);
 });
 

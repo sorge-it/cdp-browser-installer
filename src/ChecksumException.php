@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace SorgeIt\CdpBrowserInstaller;
 
 /**
- * `install`: the SHA-256 of an archive differs from the pin; that archive is deleted and was not
- * unpacked. A retry helps only if the run deleted an archive from the cache. `pin`: the MD5 of a
- * download differs from the one the storage sent, and no pin is written.
+ * `install`: the SHA-256 of an archive differs from the pin file; the archive is deleted, not
+ * unpacked. A retry helps only for an archive from the cache; the message says which. `pin`: the
+ * MD5 of a download differs from the one the storage sent; no pin file is written.
+ *
+ * @api
  */
 final class ChecksumException extends InstallerException
 {

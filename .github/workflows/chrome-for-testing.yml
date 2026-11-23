@@ -119,7 +119,7 @@ jobs:
             $stable = (string) (json_decode((string) file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR)["channels"]["Stable"]["version"] ?? "");
             SorgeIt\CdpBrowserInstaller\Pin::checkVersion($stable);
             if (version_compare($stable, $pinned, ">")) {
-                printf("::error::Chrome for Testing Stable is %s, the pin is %s. Update the pin; see \"When the Chrome for Testing check fails\" in CONTRIBUTING.md.\n", $stable, $pinned);
+                printf("::error::Chrome for Testing Stable is %s, the pin is %s. Update the pin; see https://github.com/sorge-it/cdp-browser-installer/blob/main/.github/CONTRIBUTING.md#when-the-chrome-for-testing-check-fails\n", $stable, $pinned);
                 exit(1);
             }
             printf("The pin %s is not older than the current Stable %s.\n", $pinned, $stable);

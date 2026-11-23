@@ -43,7 +43,7 @@ final class PinCommand extends Command
     #[Override]
     protected function configure(): void
     {
-        $this->addArgument('version', InputArgument::REQUIRED, 'A version of Chrome for Testing, such as 155.0.8059.39');
+        $this->addArgument('version', InputArgument::REQUIRED, 'A version of Chrome for Testing, such as the Stable version on https://googlechromelabs.github.io/chrome-for-testing/');
         $this->addOption('pin-file', null, InputOption::VALUE_REQUIRED, 'The pin file', Pin::FILE);
         $this->addOption('allow-root', null, InputOption::VALUE_NONE, Cli::ALLOW_ROOT);
     }
@@ -105,7 +105,7 @@ final class PinCommand extends Command
         $content = Files::quietly($read);
 
         if ($content === false) {
-            throw new InstallerException(sprintf('The downloaded file %s could not be read; no pin was written. Run `cdp-browser pin %s` again.', $file, $version));
+            throw new InstallerException(sprintf('The downloaded file %s could not be read; no pin file was written. Run `vendor/bin/cdp-browser pin %s` again.', $file, $version));
         }
 
         return $content;
@@ -146,7 +146,7 @@ final class PinCommand extends Command
         $actual = $this->read($file, $version, static fn (): string|false => md5_file($file, true));
 
         if ($actual !== $expected) {
-            throw new ChecksumException(sprintf('The MD5 of the download for %s on %s is %s, but the storage sent %s in `x-goog-hash`. The download is broken; no pin was written. Run `cdp-browser pin %s` again.', $binary->value, $platform->value, base64_encode($actual), base64_encode($expected), $version));
+            throw new ChecksumException(sprintf('The MD5 of the download for %s on %s is %s, but the storage sent %s in `x-goog-hash`. The download is broken; no pin file was written. Run `vendor/bin/cdp-browser pin %s` again.', $binary->value, $platform->value, base64_encode($actual), base64_encode($expected), $version));
         }
     }
 }

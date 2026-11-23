@@ -10,6 +10,8 @@ use JsonException;
  * One version of Chrome for Testing and the SHA-256 of each archive of the pair. Chrome for
  * Testing publishes no SHA-256 and no signature; its storage sends an MD5 and a CRC32C. So `pin`
  * compares each download with the MD5 and computes its SHA-256; a human reviews the pin file.
+ *
+ * @api
  */
 final readonly class Pin
 {
@@ -38,7 +40,7 @@ final readonly class Pin
                 $hash = $hashes[$binary->value][$platform->value] ?? '';
 
                 if (preg_match(self::SHA256, $hash) !== 1) {
-                    throw new InstallerException(sprintf('The pin of %s has no valid SHA-256 of %s for %s.', $version, $binary->value, $platform->value));
+                    throw new InstallerException(sprintf('The pin file for %s has no valid SHA-256 of %s for %s.', $version, $binary->value, $platform->value));
                 }
             }
         }
@@ -47,15 +49,30 @@ final readonly class Pin
     public static function checkVersion(string $version): void
     {
         if (preg_match(self::VERSION, $version) !== 1) {
-            throw new InstallerException(sprintf('`%s` is not a Chrome for Testing version. Use four numbers, such as 155.0.8059.39.', $version));
+            throw new InstallerException(sprintf('`%s` is not a Chrome for Testing version. Use four numbers separated by dots, such as the Stable version on https://googlechromelabs.github.io/chrome-for-testing/.', $version));
         }
+    }
+
+    /**
+     * The option that a command in a message needs to reach this pin file, or nothing for the
+     * default one. A path beyond plain characters is quoted for the shell.
+     *
+     * @internal
+     */
+    public static function option(string $file): string
+    {
+        if ($file === self::FILE) {
+            return '';
+        }
+
+        return ' --pin-file '.(preg_match('~\A[\w./-]+\z~', $file) === 1 ? $file : escapeshellarg($file));
     }
 
     public static function read(string $file): self
     {
         if (! is_file($file)) {
             // A relative path counts from the working directory, which a test runner may change.
-            throw new InstallerException(sprintf('There is no pin file at %s, seen from the working directory %s. Write one with `cdp-browser pin <version>`.', $file, (string) getcwd()));
+            throw new InstallerException(sprintf('There is no pin file at %s, seen from the working directory %s. Write one with `vendor/bin/cdp-browser pin VERSION%s`, with VERSION from https://googlechromelabs.github.io/chrome-for-testing/.', $file, (string) getcwd(), self::option($file)));
         }
 
         $content = Files::quietly(static fn (): string|false => file_get_contents($file));
@@ -79,7 +96,7 @@ final readonly class Pin
             // The message prints the version, so only a checked one reaches the terminal.
             self::checkVersion($data['version']);
 
-            throw new InstallerException(sprintf('The pin file %s pins chrome-headless-shell only, in the format of release 1.x. Write it again with `cdp-browser pin %s`: it pins chrome-headless-shell and chromedriver.', $file, $data['version']));
+            throw new InstallerException(sprintf('The pin file %s pins chrome-headless-shell only, in the format of release 1.x. Write it again with `vendor/bin/cdp-browser pin %s%s`: it pins chrome-headless-shell and chromedriver.', $file, $data['version'], self::option($file)));
         }
 
         $hashes = [];

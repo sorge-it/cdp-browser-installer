@@ -4,7 +4,65 @@ All notable changes to this package are in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.1] - 2026-11-19
+## [2.1.0] - 2026-11-23
+
+The exit code now tells whether a retry can help: a lock timeout ends with 75, which a retry step
+in CI can react to, and four `curl` errors that a retry does not fix (exit codes 23, 60, 63 and 77)
+end with 1. Six causes move to another
+exception class, and so to another exit code. The existing classes, their `EXIT_CODE` and their
+members are unchanged. 2.0.x documented the old class and exit code of these causes, so code that relies on
+them needs a change; see
+[Upgrade from 2.0.x](https://github.com/sorge-it/cdp-browser-installer/blob/main/CHANGELOG.md#upgrade-from-20x).
+
+### Upgrade from 2.0.x
+
+- To retry a lock timeout too, add `LockException` to a retry on `DownloadException`:
+  `catch (DownloadException|LockException)`,
+  as the README does under
+  "[Use from PHP](https://github.com/sorge-it/cdp-browser-installer#use-from-php)".
+- Catch `InstallerException` for `curl` exit codes 23, 60, 63 and 77; a `catch (DownloadException)`
+  no longer catches them.
+- Do not read `getPrevious() !== null` as a timeout or a signal: when a tool that the installer
+  starts fails with an exit code, `getPrevious()` now returns Symfony's `ProcessFailedException`.
+- In a script that tests the exit code, expect 75, not 1, after a lock timeout or a checked archive
+  that another install removed, and 1, not 75, after `curl` exit codes 23, 60, 63 and 77.
+
+### Added
+
+- `LockException`, a subclass of `InstallerException` with exit code 75. An install throws it when
+  it waits past the lock timeout, or when another install removed its checked archive, where
+  `flock()` does not lock.
+
+### Changed
+
+- A lock timeout, and a checked archive that another install removed, end `install` with exit
+  code 75, not 1.
+- `curl` exit code 23 (it cannot write the archive, such as on a full disk), 60 (a certificate that
+  it does not trust), 63 (an archive above 500 MiB) or 77 (it cannot read its CA certificates) ends
+  the download with an `InstallerException` and exit code 1, not a `DownloadException` and 75: a
+  retry does not help.
+- When a tool that the installer starts, not `zipinfo` or `unzip`, fails with an exit code other
+  than 0, `getPrevious()` returns Symfony's `ProcessFailedException`, not `null`; its
+  `getProcess()->getExitCode()` returns that exit code.
+- The README section "API" says that a minor release can move a cause to another subclass, and so
+  to another exit code, or change the exception that `getPrevious()` returns, and that the
+  CHANGELOG names each change.
+- The messages name the next step in more cases, and name the command as
+  `vendor/bin/cdp-browser`, which works from the root of the project. A `ChecksumException` in `install`
+  says "pin file", not "pin": for an archive from the cache, it says to run `install` again; for a
+  new download, it says not to pin these bytes, with a link to the security policy. `pin` says "pin
+  file" too. A timeout of a tool that the installer starts, not `zipinfo` or `unzip`, names
+  `CDP_BROWSER_TIMEOUT` and `$timeout`; a lock timeout also names `$lockTimeout`; an invalid version
+  names the Chrome for Testing dashboard. A message about a pin file other than `.chrome-version`
+  names `--pin-file` in its next step.
+- Each class of the API carries `@api`.
+- `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` and `SECURITY.md` moved to `.github/`, so the package
+  archive no longer contains `SECURITY.md`.
+- The shell commands of the README that start the browser add `--no-sandbox` on Linux.
+- The README states its scope in a table, with a row `in` or `out` for each behavior, and each case
+  under "When to use it and when not to" names an alternative.
+
+## [2.0.1] - 2026-11-20
 
 The API, the commands, the options and the exit codes stay as in 2.0.0. A lock timeout still ends
 `install` with exit code 1, although its message now says to run `cdp-browser install` again.
@@ -199,6 +257,7 @@ the SHA-256 before each unpack, also for an archive that a CI cache restored, an
 tools. The README states what the installer refuses, what it checks, and what it does not check.
 The 0.x releases were private.
 
+[2.1.0]: https://github.com/sorge-it/cdp-browser-installer/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/sorge-it/cdp-browser-installer/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/sorge-it/cdp-browser-installer/compare/v1.0.1...v2.0.0
 [1.0.1]: https://github.com/sorge-it/cdp-browser-installer/compare/v1.0.0...v1.0.1
