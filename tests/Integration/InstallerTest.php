@@ -648,25 +648,29 @@ it('gives a whole pair to two runs that the lock does not exclude', function ():
     symlink('lock-a', $this->target.'/.lock');
     $pinFile = $this->directory.'/.chrome-version';
     $this->pin->write($pinFile);
-    // The first run has written its download; its curl answers 2.5 s later.
-    $this->tools->delay(2500);
+    // The first call of curl has written its download and waits while the file `hold-curl`
+    // exists: the second run downloads both archives first, however long it takes.
+    touch($this->directory.'/tools/hold-curl');
     $binary = null;
 
     [$first] = php(installInProcess($this->tools, $this->directory.'/cache', $pinFile), meanwhile: function () use (&$binary): void {
-        $deadline = microtime(true) + 10;
+        try {
+            $deadline = microtime(true) + 10;
 
-        while (glob($this->target.'/*.zip.part*') === []) {
-            if (microtime(true) >= $deadline) {
-                throw new RuntimeException('The other process wrote no download within 10 seconds.');
+            while (! is_dir($this->directory.'/tools/held-curl')) {
+                if (microtime(true) >= $deadline) {
+                    throw new RuntimeException('The other process started no download within 10 seconds.');
+                }
+
+                usleep(10_000);
             }
 
-            usleep(10_000);
+            unlink($this->target.'/.lock');
+            symlink('lock-b', $this->target.'/.lock');
+            $binary = installBrowser($this->installer, $this->pin);
+        } finally {
+            unlink($this->directory.'/tools/hold-curl');
         }
-
-        unlink($this->target.'/.lock');
-        symlink('lock-b', $this->target.'/.lock');
-        $this->tools->delay(0);
-        $binary = installBrowser($this->installer, $this->pin);
     });
 
     // The first run downloads the browser; the second downloads both; the first then finds the
