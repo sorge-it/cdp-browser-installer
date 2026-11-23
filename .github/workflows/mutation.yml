@@ -1,0 +1,47 @@
+name: mutation
+
+# A serial run of all of src/ takes about 20 minutes, so it runs each week and on request, not on
+# each push.
+on:
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A second run waits for the first instead of ending it.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+# Kept by hand, as in tests.yml.
+env:
+  SETUP_PHP_COMPOSER: composer:2.10.3@sha256:7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6
+
+jobs:
+  mutation:
+    name: Mutation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          extensions: curl, mbstring, pcntl, posix, zip
+          coverage: pcov
+          tools: ${{ env.SETUP_PHP_COMPOSER }}
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      # Serial: with --parallel, Pest counts each mutant as caught.
+      - name: Mutation
+        run: composer test:mutation

@@ -18,12 +18,12 @@ composer test           # pint, rector, PHPStan level max, type coverage 100%, e
                         # each tool checks tests/ as well; the type coverage does not count
                         # the return types of functions and closures
 composer test:coverage  # line coverage 100%, with pcov; a CI job
+composer test:mutation  # mutation testing, serial; the weekly workflow mutation
 composer lint           # runs rector, then pint, and fixes what they find
 ```
 
-To run mutation testing by hand: `vendor/bin/pest --mutate --everything --covered-only`, without
-`--parallel`: with `--parallel`, Pest counted every mutant as caught, while a serial run of the
-same code found untested ones. Pest's stream wrapper makes the tests of `flock()` and of unreadable
+`composer test:mutation` runs without `--parallel`: with `--parallel`, Pest counted every mutant as
+caught, while a serial run of the same code found untested ones. Pest's stream wrapper makes the tests of `flock()` and of unreadable
 files fail without any mutant, so a mutant there that counts as caught may have escaped: check it
 by hand.
 

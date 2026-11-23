@@ -55,8 +55,12 @@
         ],
         "test:unit": "pest",
         "test:types": "phpstan --memory-limit=256M",
-        "test:type-coverage": "@php -d memory_limit=1G vendor/bin/pest --type-coverage --min=100 --no-cache --configuration=phpunit.type-coverage.xml",
+        "test:type-coverage": "@php -d memory_limit=1G vendor/bin/pest --type-coverage --min=100 --no-cache --configuration=type-coverage.xml",
         "test:coverage": "@php -d memory_limit=1G vendor/bin/pest --coverage --min=100",
+        "test:mutation": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php -d memory_limit=1G vendor/bin/pest --mutate --everything --covered-only --min=98"
+        ],
         "test:lint": [
             "pint --test",
             "rector --dry-run"

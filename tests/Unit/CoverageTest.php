@@ -58,7 +58,7 @@ it('checks the types of each source directory and of tests', function (): void {
 
     expect($composer['scripts']['test'])->toContain('@test:type-coverage')
         ->and($composer['scripts']['test:type-coverage'])->toContain('vendor/bin/pest --type-coverage --min=100 ')
-        ->and($option)->toBe('--configuration=phpunit.type-coverage.xml')
+        ->and($option)->toBe('--configuration=type-coverage.xml')
         ->and($directories)->toBe([...ConfigurationSourceDetector::detect([]), realpath($root.'/tests')])
         ->toContain(realpath($root.'/src'))
         ->and($skipped)->toBe([]);
