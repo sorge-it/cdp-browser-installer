@@ -19,12 +19,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
 
-# Kept by hand: Dependabot moves the actions, but no image digest and no checksum of a tool.
+# Dependabot updates the actions and the images of `.github/docker`. Composer for setup-php, pinned
+# by digest, is updated by hand, to the version of the Composer image in `.github/docker`.
 env:
-  COMPOSER_IMAGE: composer:2.10.3@sha256:2cf275428757e5435a667bfc0d038b14520ca02be2b1b70d44a05c8c19e2de48
   SETUP_PHP_COMPOSER: composer:2.10.3@sha256:7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6
-  ZIZMOR_IMAGE: ghcr.io/zizmorcore/zizmor:1.31.1@sha256:42d409dbb851d4c5d35a058cf042b828bea1e3f2884378c526eb0974780e18d9
-  ACTIONLINT_IMAGE: rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
 
 jobs:
   # The workflows and the Dependabot configuration: zizmor with the audits that need no GitHub
@@ -41,10 +39,39 @@ jobs:
           persist-credentials: false
 
       - name: Audit with zizmor
-        run: docker run --rm --volume "$PWD:/src:ro" --workdir /src "$ZIZMOR_IMAGE" --offline .github
+        run: |
+          docker build --quiet --tag zizmor .github/docker/zizmor
+          docker run --rm --volume "$PWD:/src:ro" --workdir /src zizmor --offline .github
 
       - name: Lint with actionlint
-        run: docker run --rm --volume "$PWD:/src:ro" --workdir /src "$ACTIONLINT_IMAGE" -no-color
+        run: |
+          docker build --quiet --tag actionlint .github/docker/actionlint
+          docker run --rm --volume "$PWD:/src:ro" --workdir /src actionlint -no-color
+
+  # composer.json and the lock, once: they do not change with the PHP of a job.
+  package:
+    name: Package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: ${{ env.SETUP_PHP_COMPOSER }}
+
+      - name: Validate
+        run: composer validate --strict
+
+      - name: Audit
+        run: composer audit --locked
 
   tests:
     name: PHP ${{ matrix.php }} · ${{ matrix.stack }} · ${{ matrix.os }}
@@ -103,7 +130,7 @@ jobs:
             *) echo "No install for the stack $STACK." && exit 1 ;;
           esac
 
-      # The job coverage audits composer.lock; the stacks lowest and newest install other versions.
+      # The job Package audits composer.lock; the stacks lowest and newest install other versions.
       - name: Audit the installed packages
         if: matrix.stack != 'locked'
         run: composer audit
@@ -136,15 +163,8 @@ jobs:
           coverage: pcov
           tools: ${{ env.SETUP_PHP_COMPOSER }}
 
-      # Once, in this job only: composer.json and the lock do not change with the PHP of a job.
-      - name: Validate composer.json and the lock
-        run: composer validate --strict
-
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist
-
-      - name: Audit the locked packages
-        run: composer audit --locked
 
       - name: Coverage
         run: composer test:coverage
@@ -161,11 +181,6 @@ jobs:
       matrix:
         php: ['8.4', '8.5']
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
-        include:
-          - php: '8.4'
-            image: php:8.4.27-cli-alpine@sha256:d8784155c4d37986be9ddd7a8950df7e78998cc48e35472cd69e2b9371424a65
-          - php: '8.5'
-            image: php:8.5.12-cli-alpine@sha256:e899a75c775804e5466dbd9c96b31f8b6c6ae2ddb053a8466223a0c32992ff8e
 
     steps:
       - name: Checkout
@@ -173,15 +188,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Test
+      - name: Build
         env:
-          IMAGE: ${{ matrix.image }}
+          PHP: ${{ matrix.php }}
+        run: docker build --quiet --tag tests ".github/docker/alpine-$PHP"
+
+      - name: Test
         run: |
-          docker run --rm --entrypoint cat "$COMPOSER_IMAGE" /usr/bin/composer > "$RUNNER_TEMP/composer"
-          chmod 755 "$RUNNER_TEMP/composer"
-          docker run --rm --volume "$PWD:/src:ro" --volume "$RUNNER_TEMP/composer:/usr/local/bin/composer:ro" --entrypoint sh "$IMAGE" -euc '
-            apk add --no-cache unzip libzip-dev $PHPIZE_DEPS linux-headers > /dev/null
-            docker-php-ext-install zip pcntl > /dev/null
+          docker run --rm --volume "$PWD:/src:ro" --entrypoint sh tests -euc '
             cp -a /src /work
             chown -R www-data /work
             su www-data -s /bin/sh -c "cd /work && export COMPOSER_HOME=/tmp/composer && composer install --no-interaction --no-progress && composer test"
@@ -200,14 +214,12 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Build
+        run: docker build --quiet --tag tests .github/docker/debian
+
       - name: Test
         run: |
-          docker run --rm --entrypoint cat "$COMPOSER_IMAGE" /usr/bin/composer > "$RUNNER_TEMP/composer"
-          chmod 755 "$RUNNER_TEMP/composer"
-          docker run --rm --volume "$PWD:/src:ro" --volume "$RUNNER_TEMP/composer:/usr/local/bin/composer:ro" --entrypoint sh php:8.4.27-cli@sha256:9cf851bc2c1b37c3e59dfd677a3c3e56d485af5a47c93f629424bb039eafcb69 -euc '
-            apt-get -qq update
-            apt-get -qq install -y --no-install-recommends unzip libzip-dev > /dev/null
-            docker-php-ext-install zip pcntl > /dev/null
+          docker run --rm --volume "$PWD:/src:ro" --entrypoint sh tests -euc '
             cp -a /src /work
             chown -R www-data /work
             su www-data -s /bin/sh -c "cd /work && export COMPOSER_HOME=/tmp/composer && composer install --no-interaction --no-progress && composer test"
@@ -280,7 +292,6 @@ jobs:
           "$browser" "$@" --dump-dom 'data:text/html,<p>ok</p>' | grep -q '<p>ok</p>'
 
   # A minimal image has none of the libraries a runner brings, so only here `deps` proves its list.
-  # Ubuntu 26.04, as the PHP of 24.04 is 8.3.
   system-libraries:
     name: deps · ${{ matrix.system }} · ${{ matrix.runner }}
     runs-on: ${{ matrix.runner }}
@@ -293,9 +304,9 @@ jobs:
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
         include:
           - system: 'debian:13'
-            image: debian:13@sha256:2dc419c6d7fe3dad0a2f9fd469c34cc90b0f9ba642d8fde837fe3d7d34a0e7f1
+            image: deps-debian
           - system: 'ubuntu:26.04'
-            image: ubuntu:26.04@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c
+            image: deps-ubuntu
 
     steps:
       - name: Checkout
@@ -303,13 +314,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install as root, run as a user
+      - name: Build
         env:
           IMAGE: ${{ matrix.image }}
+        run: docker build --quiet --tag deps ".github/docker/$IMAGE"
+
+      - name: Install as root, run as a user
         run: |
-          docker run --rm --entrypoint cat "$COMPOSER_IMAGE" /usr/bin/composer > "$RUNNER_TEMP/composer"
-          chmod 755 "$RUNNER_TEMP/composer"
-          docker run --rm --volume "$PWD:/src" --volume "$RUNNER_TEMP/composer:/usr/local/bin/composer:ro" --workdir /src "$IMAGE" bash -euo pipefail -c '
+          docker run --rm --volume "$PWD:/src" --workdir /src deps bash -euo pipefail -c '
             apt-get update
             apt-get install --yes --no-install-recommends ca-certificates php-cli php-curl php-xml php-zip
             composer install --no-interaction --no-progress --no-dev
@@ -343,9 +355,12 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Build
+        run: docker build --quiet --tag composer .github/docker/composer
+
       - name: Refuse to download, install the pair of Alpine, use it
         run: |
-          docker run --rm --volume "$PWD:/src" --workdir /src --entrypoint sh "$COMPOSER_IMAGE" -euc '
+          docker run --rm --volume "$PWD:/src" --workdir /src --entrypoint sh composer -euc '
             composer install --no-interaction --no-progress --no-dev
             php bin/cdp-browser deps
             adduser -D tester

@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - .chrome-version
+      - .github/docker/alpine-8.5/**
       - .github/workflows/works-with.yml
       - bin/**
       - composer.json
@@ -26,11 +27,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
 
-# Kept by hand, as in tests.yml.
+# Kept by hand, as in tests.yml. The Alpine container is the image of `.github/docker/alpine-8.5`.
 env:
-  COMPOSER_IMAGE: composer:2.10.3@sha256:2cf275428757e5435a667bfc0d038b14520ca02be2b1b70d44a05c8c19e2de48
   SETUP_PHP_COMPOSER: composer:2.10.3@sha256:7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6
-  ALPINE_IMAGE: php:8.5.12-cli-alpine@sha256:e899a75c775804e5466dbd9c96b31f8b6c6ae2ddb053a8466223a0c32992ff8e
 
 jobs:
   # Each tool under "Works with" in the README, at its newest release, drives the browser of
@@ -164,21 +163,16 @@ jobs:
         with:
           persist-credentials: false
 
-      # chrome-php/chrome needs ext-sockets, php-webdriver/webdriver ext-zip.
+      # chrome-php/chrome needs ext-sockets, php-webdriver/webdriver ext-zip; the image has both.
       - name: Start the container
+        working-directory: ${{ github.workspace }}
         run: |
-          docker run --rm --entrypoint cat "$COMPOSER_IMAGE" /usr/bin/composer > "$RUNNER_TEMP/composer"
-          chmod 755 "$RUNNER_TEMP/composer"
+          docker build --quiet --tag works-with .github/docker/alpine-8.5
           docker run --rm --detach --init --shm-size=1g --name alpine \
             --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" --volume "$RUNNER_TEMP:$RUNNER_TEMP" \
-            --volume "$RUNNER_TEMP/composer:/usr/local/bin/composer:ro" \
-            --workdir "$PWD" --env GITHUB_WORKSPACE --env RUNNER_TEMP \
+            --workdir "$PWD/works-with" --env GITHUB_WORKSPACE --env RUNNER_TEMP \
             --env CDP_BROWSER_CHROME=/usr/bin/chromium --env CDP_BROWSER_CHROMEDRIVER=/usr/bin/chromedriver \
-            --entrypoint sleep "$ALPINE_IMAGE" infinity
-          docker exec alpine sh -euc '
-            apk add --no-cache unzip libzip-dev $PHPIZE_DEPS linux-headers > /dev/null
-            docker-php-ext-install sockets zip > /dev/null
-          '
+            --entrypoint sleep works-with infinity
           docker exec alpine adduser -D -u "$(id -u)" tester
 
       - name: Install this checkout and the tools

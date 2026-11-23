@@ -1,15 +1,43 @@
 version: 2
 
+# Each update waits 14 days after its release, so a broken or taken-over release is found by others
+# first. No Composer: the lock serves only the tests, and the `newest` job takes the new versions
+# on each run.
 updates:
-  # Each action is pinned to a commit. Dependabot moves the commit and the version comment
-  # together. Composer is not here: the lock serves only the tests, and the `newest` job takes
-  # the new versions on each run.
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     cooldown:
-      default-days: 7
+      default-days: 14
     groups:
       actions:
         patterns: ['*']
+
+  # The images of the jobs in Docker and of the workflows, and the image of the demo.
+  - package-ecosystem: docker
+    directories:
+      - /demo
+      - /.github/docker/actionlint
+      - /.github/docker/alpine-8.4
+      - /.github/docker/alpine-8.5
+      - /.github/docker/composer
+      - /.github/docker/debian
+      - /.github/docker/deps-debian
+      - /.github/docker/deps-ubuntu
+      - /.github/docker/zizmor
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 14
+    groups:
+      images:
+        patterns: ['*']
+    # The PHP of each image and the release of each system stay; only their patches are updates.
+    ignore:
+      - dependency-name: php
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: debian
+        update-types: [version-update:semver-major]
+      - dependency-name: ubuntu
+        update-types: [version-update:semver-major, version-update:semver-minor]
