@@ -14,18 +14,19 @@ updates:
       actions:
         patterns: ['*']
 
-  # The images of the jobs in Docker and of the workflows, and the image of the demo.
+  # The images of the jobs in Docker and of the workflows, and the image of the demo. None is under
+  # .github: GitHub refuses a pull request of this ecosystem that changes a file there.
   - package-ecosystem: docker
     directories:
       - /demo
-      - /.github/docker/actionlint
-      - /.github/docker/alpine-8.4
-      - /.github/docker/alpine-8.5
-      - /.github/docker/composer
-      - /.github/docker/debian
-      - /.github/docker/deps-debian
-      - /.github/docker/deps-ubuntu
-      - /.github/docker/zizmor
+      - /docker/actionlint
+      - /docker/alpine-8.4
+      - /docker/alpine-8.5
+      - /docker/composer
+      - /docker/debian
+      - /docker/deps-debian
+      - /docker/deps-ubuntu
+      - /docker/zizmor
     schedule:
       interval: monthly
     cooldown:

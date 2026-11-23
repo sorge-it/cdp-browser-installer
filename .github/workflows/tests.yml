@@ -19,8 +19,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
 
-# Dependabot updates the actions and the images of `.github/docker`. Composer for setup-php, pinned
-# by digest, is updated by hand, to the version of the Composer image in `.github/docker`.
+# Dependabot updates the actions and the images in `docker/`. Composer for setup-php, pinned by
+# digest, is updated by hand, to the version of the image in `docker/composer`.
 env:
   SETUP_PHP_COMPOSER: composer:2.10.3@sha256:7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6
 
@@ -40,12 +40,12 @@ jobs:
 
       - name: Audit with zizmor
         run: |
-          docker build --quiet --tag zizmor .github/docker/zizmor
+          docker build --quiet --tag zizmor docker/zizmor
           docker run --rm --volume "$PWD:/src:ro" --workdir /src zizmor --offline .github
 
       - name: Lint with actionlint
         run: |
-          docker build --quiet --tag actionlint .github/docker/actionlint
+          docker build --quiet --tag actionlint docker/actionlint
           docker run --rm --volume "$PWD:/src:ro" --workdir /src actionlint -no-color
 
   # composer.json and the lock, once: they do not change with the PHP of a job.
@@ -191,7 +191,7 @@ jobs:
       - name: Build
         env:
           PHP: ${{ matrix.php }}
-        run: docker build --quiet --tag tests ".github/docker/alpine-$PHP"
+        run: docker build --quiet --tag tests "docker/alpine-$PHP"
 
       - name: Test
         run: |
@@ -215,7 +215,7 @@ jobs:
           persist-credentials: false
 
       - name: Build
-        run: docker build --quiet --tag tests .github/docker/debian
+        run: docker build --quiet --tag tests docker/debian
 
       - name: Test
         run: |
@@ -317,7 +317,7 @@ jobs:
       - name: Build
         env:
           IMAGE: ${{ matrix.image }}
-        run: docker build --quiet --tag deps ".github/docker/$IMAGE"
+        run: docker build --quiet --tag deps "docker/$IMAGE"
 
       - name: Install as root, run as a user
         run: |
@@ -356,7 +356,7 @@ jobs:
           persist-credentials: false
 
       - name: Build
-        run: docker build --quiet --tag composer .github/docker/composer
+        run: docker build --quiet --tag composer docker/composer
 
       - name: Refuse to download, install the pair of Alpine, use it
         run: |
