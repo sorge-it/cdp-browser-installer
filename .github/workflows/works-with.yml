@@ -7,7 +7,7 @@ on:
   pull_request:
     paths:
       - .chrome-version
-      - .github/docker/alpine-8.5/**
+      - docker/alpine-8.5/**
       - .github/workflows/works-with.yml
       - bin/**
       - composer.json
@@ -27,7 +27,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
 
-# Kept by hand, as in tests.yml. The Alpine container is the image of `.github/docker/alpine-8.5`.
+# Kept by hand, as in tests.yml. The Alpine container is the image of `docker/alpine-8.5`.
 env:
   SETUP_PHP_COMPOSER: composer:2.10.3@sha256:7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6
 
@@ -167,7 +167,7 @@ jobs:
       - name: Start the container
         working-directory: ${{ github.workspace }}
         run: |
-          docker build --quiet --tag works-with .github/docker/alpine-8.5
+          docker build --quiet --tag works-with docker/alpine-8.5
           docker run --rm --detach --init --shm-size=1g --name alpine \
             --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" --volume "$RUNNER_TEMP:$RUNNER_TEMP" \
             --workdir "$PWD/works-with" --env GITHUB_WORKSPACE --env RUNNER_TEMP \

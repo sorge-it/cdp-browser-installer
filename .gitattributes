@@ -3,6 +3,7 @@
 /.chrome-version export-ignore
 /.github export-ignore
 /demo export-ignore
+/docker export-ignore
 /.gitattributes export-ignore
 /.gitignore export-ignore
 /composer.lock export-ignore
